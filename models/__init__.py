@@ -1,0 +1,21 @@
+from models.entities import (
+    Booking,
+    Bus,
+    BusDistrict,
+    BusLocation,
+    BusPark,
+    Company,
+    CompanyDistrict,
+    District,
+    Driver,
+    FareConfig,
+    Province,
+    RefreshToken,
+    Route,
+    RoutePark,
+    RouteStop,
+    Stop,
+    Trip,
+    User,
+)
+

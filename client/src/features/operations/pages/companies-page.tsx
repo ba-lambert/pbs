@@ -165,7 +165,7 @@ export function CompaniesPage() {
     <div className="space-y-4">
       <div className="flex items-end justify-between gap-3">
         <h2 className="text-5 font-semibold text-zinc-900 md:text-4xl">Companies</h2>
-        <Button type="button" onClick={() => setIsCreateOpen(true)}>
+        <Button type="button" onClick={() => setIsCreateOpen(true)} >
           Add company
         </Button>
       </div>

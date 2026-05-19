@@ -5,7 +5,7 @@ import { getToken } from '../../shared/lib/auth-storage'
 import { requireAuth, redirectIfAuthenticated } from './guards'
 import { LoginPage } from '../../features/auth/pages/login-page'
 import { GeographyPage } from '../../features/geography/pages/geography-page'
-import { CompaniesPage, FleetPage, UsersPage } from '../../features/operations'
+import { CompaniesPage, FleetPage, UsersPage, PricingPage } from '../../features/operations'
 import { DashboardOverview, TripsPage } from '../routes/operations-pages'
 
 const rootRoute = createRootRoute({
@@ -44,11 +44,12 @@ const usersRoute = createRoute({ getParentRoute: () => dashboardRoute, path: '/u
 const geographyRoute = createRoute({ getParentRoute: () => dashboardRoute, path: '/geography', component: GeographyPage })
 const fleetRoute = createRoute({ getParentRoute: () => dashboardRoute, path: '/fleet', component: FleetPage })
 const tripsRoute = createRoute({ getParentRoute: () => dashboardRoute, path: '/trips', component: TripsPage })
+const pricingRoute = createRoute({ getParentRoute: () => dashboardRoute, path: '/pricing', component: PricingPage })
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
-  dashboardRoute.addChildren([overviewRoute, companiesRoute, usersRoute, geographyRoute, fleetRoute, tripsRoute]),
+  dashboardRoute.addChildren([overviewRoute, companiesRoute, usersRoute, geographyRoute, fleetRoute, tripsRoute, pricingRoute]),
 ])
 
 export const router = createRouter({ routeTree })

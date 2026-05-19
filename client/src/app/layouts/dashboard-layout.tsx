@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useAuth } from '../providers/auth-provider'
 import { Avatar, Badge, Button, Input } from '../../shared/ui'
 import { useRoleNavigation } from '../../features/auth/hooks/use-role-navigation'
-import { FiGrid, FiMap, FiBriefcase, FiTruck, FiGitBranch, FiUsers, FiLogOut } from 'react-icons/fi'
+import { FiGrid, FiMap, FiBriefcase, FiTruck, FiGitBranch, FiUsers, FiLogOut, FiSettings } from 'react-icons/fi'
 
 export function DashboardLayout() {
   const { role, logout } = useAuth()
@@ -17,7 +17,7 @@ export function DashboardLayout() {
     { title: 'Operate', items: navItems.filter((i) => i.to === '/dashboard' || i.to === '/dashboard/trips') },
     { title: 'Network', items: navItems.filter((i) => i.to === '/dashboard/geography' || i.to === '/dashboard/companies') },
     { title: 'Fleet', items: navItems.filter((i) => i.to === '/dashboard/fleet') },
-    { title: 'Admin', items: navItems.filter((i) => i.to === '/dashboard/users') },
+    { title: 'Admin', items: navItems.filter((i) => i.to === '/dashboard/users' || i.to === '/dashboard/pricing') },
   ]
 
   const iconFor = (to: string) => {
@@ -27,6 +27,7 @@ export function DashboardLayout() {
     if (to === '/dashboard/fleet') return <FiTruck size={14} />
     if (to === '/dashboard/trips') return <FiGitBranch size={14} />
     if (to === '/dashboard/users') return <FiUsers size={14} />
+    if (to === '/dashboard/pricing') return <FiSettings size={14} />
     return <FiGrid size={14} />
   }
 
@@ -97,7 +98,7 @@ export function DashboardLayout() {
           <button className="rounded border border-zinc-200 px-2 py-1 text-sm lg:hidden" onClick={() => setSidebarOpen(true)}>
             ☰
           </button>
-          <div className="text-sm text-zinc-600">Rwanda Transit Ops /</div>
+          <div className="text-sm text-zinc-600">Rwanda Transit Ops</div>
           <div className="text-sm font-medium text-zinc-800">{currentPathLabel}</div>
           <div className="ml-auto w-full max-w-sm">
             <Input placeholder="Search routes, buses, drivers..." className="bg-[var(--color-surface-muted)]" />

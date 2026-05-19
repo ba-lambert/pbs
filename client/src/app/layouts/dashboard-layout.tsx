@@ -106,11 +106,6 @@ export function DashboardLayout() {
           <select className="h-10 rounded-md border border-zinc-200 bg-white px-3 text-sm text-zinc-700">
             <option>Yahoo Express</option>
           </select>
-          <div className="hidden items-center gap-1 rounded-md border border-zinc-200 p-1 md:flex">
-            <button className="rounded px-2 py-1 text-sm text-zinc-500">Super</button>
-            <button className="rounded bg-zinc-200 px-2 py-1 text-sm text-zinc-700">Company</button>
-            <button className="rounded px-2 py-1 text-sm text-zinc-500">Dispatch</button>
-          </div>
           <div className="hidden items-center gap-2 md:flex">
             <Avatar name="Joseph Mukasa" />
             <div>

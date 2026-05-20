@@ -10,6 +10,9 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     role: str | None = None
+    must_change_password: bool = False
+    user_id: int | None = None
+    full_name: str | None = None
 
 
 class LoginRequest(BaseModel):
@@ -27,6 +30,25 @@ class UserCreate(BaseModel):
     password: str = Field(min_length=8)
     role: Role
     company_id: int | None = None
+
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    full_name: str
+    password: str = Field(min_length=8)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8)
+
+
+class PaymentIntentCreate(BaseModel):
+    trip_id: int
+    origin_type: str
+    origin_id: int
+    destination_type: str
+    destination_id: int
 
 
 class CompanyCreate(BaseModel):
@@ -97,6 +119,7 @@ class BusCreate(BaseModel):
 
 class DriverCreate(BaseModel):
     company_id: int
+    email: str | None = None
     full_name: str
     gender: str | None = None
     bus_id: int | None = None
@@ -128,6 +151,7 @@ class BookingCreate(BaseModel):
     destination_stop_id: int | None = None
     destination_park_id: int | None = None
     destination_district_id: int | None = None
+    payment_intent_id: str | None = None
 
 
 class FareConfigUpdate(BaseModel):

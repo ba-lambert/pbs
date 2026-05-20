@@ -59,6 +59,9 @@ class User(Base):
     )
     company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id", ondelete="SET NULL"), nullable=True, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
+    password_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    profile_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -173,6 +176,8 @@ class Booking(Base):
     distance_km: Mapped[float] = mapped_column(Float)
     fare_rwf: Mapped[float] = mapped_column(Float)
     status: Mapped[str] = mapped_column(String(40), default="booked")
+    payment_intent_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    payment_status: Mapped[str] = mapped_column(String(40), default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

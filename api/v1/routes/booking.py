@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from api.core.config import settings
 from api.core.database import get_db
 from api.deps import get_current_user, require_roles
 from api.schemas import BookingCreate
@@ -53,6 +54,17 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db), curren
     fare_cfg = db.scalar(select(FareConfig).order_by(FareConfig.id.asc()))
     base = fare_cfg.base_rwf_per_km if fare_cfg else 50.0
     fare = calculate_linear_fare(distance_km, base)
+    payment_status = "pending"
+    if payload.payment_intent_id and settings.stripe_secret_key:
+        import stripe
+        stripe.api_key = settings.stripe_secret_key
+        intent = stripe.PaymentIntent.retrieve(payload.payment_intent_id)
+        if intent.status != "succeeded":
+            raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Payment not completed")
+        payment_status = "paid"
+    elif payload.payment_intent_id:
+        payment_status = "paid"
+
     booking = Booking(
         passenger_id=current_user.id,
         trip_id=payload.trip_id,
@@ -64,11 +76,13 @@ def create_booking(payload: BookingCreate, db: Session = Depends(get_db), curren
         distance_km=distance_km,
         fare_rwf=fare,
         status="booked",
+        payment_intent_id=payload.payment_intent_id,
+        payment_status=payment_status,
     )
     db.add(booking)
     db.commit()
     db.refresh(booking)
-    return {"id": booking.id, "distance_km": booking.distance_km, "fare_rwf": booking.fare_rwf}
+    return {"id": booking.id, "distance_km": booking.distance_km, "fare_rwf": booking.fare_rwf, "payment_status": payment_status}
 
 
 @router.get("", dependencies=[Depends(get_current_user)])

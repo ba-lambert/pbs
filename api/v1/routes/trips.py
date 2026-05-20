@@ -1,12 +1,13 @@
+from datetime import UTC, datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-from datetime import timedelta
 
 from api.core.database import get_db
-from api.deps import enforce_company_scope, get_current_user, require_roles
+from api.deps import enforce_company_scope, get_current_user, optional_current_user, require_roles
 from api.schemas import TripCreate
-from models.entities import Bus, Driver, Role, Route, Trip, User
+from models.entities import Booking, Bus, Driver, Role, Route, Stop, Trip, User
 
 router = APIRouter()
 
@@ -41,6 +42,122 @@ def create_trip(payload: TripCreate, db: Session = Depends(get_db), current_user
     db.commit()
     db.refresh(item)
     return {"id": item.id}
+
+
+@router.get("/available")
+def list_available_trips(
+    route_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    """Public endpoint — returns upcoming trips with seat availability."""
+    now = datetime.now(UTC)
+    query = (
+        select(Trip, Bus, Route)
+        .join(Bus, Bus.id == Trip.bus_id)
+        .join(Route, Route.id == Trip.route_id)
+        .where(Trip.departure_at >= now)
+        .where(Trip.status.in_(["scheduled", "boarding"]))
+    )
+    if route_id:
+        query = query.where(Trip.route_id == route_id)
+    rows = db.execute(query.order_by(Trip.departure_at.asc())).all()
+    result = []
+    for trip, bus, route in rows:
+        booked = db.scalar(
+            select(func.count(Booking.id))
+            .where(Booking.trip_id == trip.id)
+            .where(Booking.payment_status == "paid")
+        ) or 0
+        result.append({
+            "id": trip.id,
+            "route_id": trip.route_id,
+            "route_name": route.name,
+            "bus_id": trip.bus_id,
+            "bus_capacity": bus.capacity,
+            "bus_model": bus.model,
+            "bus_plate": bus.plate_number,
+            "driver_id": trip.driver_id,
+            "departure_at": trip.departure_at,
+            "arrival_at": trip.arrival_at,
+            "duration_minutes": trip.duration_minutes,
+            "status": trip.status,
+            "available_seats": max(0, bus.capacity - booked),
+        })
+    return result
+
+
+@router.get("/driver/active", dependencies=[Depends(require_roles(Role.DRIVER))])
+def driver_active_trip(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Returns the driver's current or next upcoming trip."""
+    driver = db.scalar(select(Driver).where(Driver.user_id == current_user.id))
+    if not driver:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver profile not found")
+    now = datetime.now(UTC)
+    trip = db.scalar(
+        select(Trip)
+        .where(Trip.driver_id == driver.id)
+        .where(Trip.departure_at >= now - timedelta(hours=2))
+        .where(Trip.departure_at <= now + timedelta(hours=24))
+        .where(Trip.status.in_(["scheduled", "boarding", "in_progress"]))
+        .order_by(Trip.departure_at.asc())
+    )
+    if not trip:
+        return None
+    bus = db.get(Bus, trip.bus_id)
+    route = db.get(Route, trip.route_id)
+    booked = db.scalar(
+        select(func.count(Booking.id))
+        .where(Booking.trip_id == trip.id)
+        .where(Booking.payment_status == "paid")
+    ) or 0
+    return {
+        "id": trip.id,
+        "route_id": trip.route_id,
+        "route_name": route.name if route else None,
+        "route_geometry": route.geometry if route else None,
+        "bus_id": trip.bus_id,
+        "bus_capacity": bus.capacity if bus else None,
+        "bus_model": bus.model if bus else None,
+        "bus_plate": bus.plate_number if bus else None,
+        "departure_at": trip.departure_at,
+        "arrival_at": trip.arrival_at,
+        "duration_minutes": trip.duration_minutes,
+        "status": trip.status,
+        "passenger_count": booked,
+    }
+
+
+@router.get("/{trip_id}/passengers", dependencies=[Depends(require_roles(Role.DRIVER))])
+def trip_passengers_by_stop(trip_id: int, db: Session = Depends(get_db)):
+    """Returns passengers grouped by boarding stop for driver view."""
+    trip = db.get(Trip, trip_id)
+    if not trip:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trip not found")
+
+    bookings = db.execute(
+        select(Booking, User, Stop)
+        .join(User, User.id == Booking.passenger_id)
+        .outerjoin(Stop, Stop.id == Booking.origin_stop_id)
+        .where(Booking.trip_id == trip_id)
+        .where(Booking.payment_status == "paid")
+    ).all()
+
+    stops: dict[int | None, dict] = {}
+    for booking, user, stop in bookings:
+        key = stop.id if stop else None
+        if key not in stops:
+            stops[key] = {
+                "stop_id": stop.id if stop else None,
+                "stop_name": stop.name if stop else "No stop",
+                "passengers": [],
+            }
+        stops[key]["passengers"].append({
+            "booking_id": booking.id,
+            "full_name": user.full_name,
+            "phone": None,
+            "profile_image_url": user.profile_image_url,
+        })
+    return list(stops.values())
 
 
 @router.get("", dependencies=[Depends(get_current_user)])

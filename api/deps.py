@@ -49,6 +49,22 @@ def enforce_company_scope(current_user: User, company_id: int | None):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Company scope violation")
 
 
+def optional_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> User | None:
+    if not credentials or credentials.scheme.lower() != "bearer":
+        return None
+    try:
+        payload = decode_token(credentials.credentials)
+    except JWTError:
+        return None
+    if payload.get("type") != "access":
+        return None
+    user = db.get(User, payload.get("uid"))
+    return user if user and user.is_active else None
+
+
 def validate_refresh_token(db: Session, token: str) -> RefreshToken:
     item = db.scalar(select(RefreshToken).where(RefreshToken.token == token, RefreshToken.revoked.is_(False)))
     if not item or item.expires_at < datetime.now(UTC):

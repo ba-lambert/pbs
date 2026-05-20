@@ -1,3 +1,5 @@
+import secrets
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -6,6 +8,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from api.core.database import get_db
+from api.core.security import hash_password
 from api.deps import enforce_company_scope, get_current_user, require_roles
 from api.schemas import BusCreate, BusDistrictAssign, DriverCreate
 from models.entities import Bus, BusDistrict, Driver, Role, User
@@ -18,6 +21,7 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 async def _parse_driver_payload(
     request: Request,
     company_id: int | None,
+    email: str | None,
     full_name: str | None,
     gender: str | None,
     bus_id: int | None,
@@ -33,6 +37,7 @@ async def _parse_driver_payload(
     return DriverCreate.model_validate(
         {
             "company_id": company_id,
+            "email": email,
             "full_name": full_name,
             "gender": gender,
             "bus_id": bus_id,
@@ -130,6 +135,7 @@ def assign_bus_districts(
 async def create_driver(
     request: Request,
     company_id: int | None = Form(default=None),
+    email: str | None = Form(default=None),
     full_name: str | None = Form(default=None),
     gender: str | None = Form(default=None),
     bus_id: int | None = Form(default=None),
@@ -145,6 +151,7 @@ async def create_driver(
     payload = await _parse_driver_payload(
         request=request,
         company_id=company_id,
+        email=email,
         full_name=full_name,
         gender=gender,
         bus_id=bus_id,
@@ -158,8 +165,30 @@ async def create_driver(
     image_url = payload.profile_image_url
     if profile_image:
         image_url = _save_driver_image(profile_image)
+
+    driver_user_id = None
+    default_password = None
+    if payload.email:
+        if db.scalar(select(User).where(User.email == payload.email)):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+        default_password = f"PBS@{secrets.randbelow(9000) + 1000}"
+        driver_user = User(
+            email=payload.email,
+            full_name=payload.full_name,
+            password_hash=hash_password(default_password),
+            role=Role.DRIVER,
+            company_id=payload.company_id,
+            is_active=True,
+            must_change_password=True,
+            password_expires_at=datetime.now(UTC) + timedelta(minutes=15),
+        )
+        db.add(driver_user)
+        db.flush()
+        driver_user_id = driver_user.id
+
     item = Driver(
         company_id=payload.company_id,
+        user_id=driver_user_id,
         full_name=payload.full_name,
         gender=payload.gender,
         bus_id=payload.bus_id,
@@ -173,7 +202,7 @@ async def create_driver(
     db.add(item)
     db.commit()
     db.refresh(item)
-    return {"id": item.id}
+    return {"id": item.id, "user_id": driver_user_id, "default_password": default_password}
 
 
 @router.get("/drivers", dependencies=[Depends(get_current_user)])
@@ -204,6 +233,7 @@ async def update_driver(
     driver_id: int,
     request: Request,
     company_id: int | None = Form(default=None),
+    email: str | None = Form(default=None),
     full_name: str | None = Form(default=None),
     gender: str | None = Form(default=None),
     bus_id: int | None = Form(default=None),
@@ -219,6 +249,7 @@ async def update_driver(
     payload = await _parse_driver_payload(
         request=request,
         company_id=company_id,
+        email=email,
         full_name=full_name,
         gender=gender,
         bus_id=bus_id,

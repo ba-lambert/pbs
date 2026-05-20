@@ -17,7 +17,7 @@ def list_provinces(db: Session = Depends(get_db)):
     return [{"id": p.id, "name": p.name} for p in items]
 
 
-@router.get("/districts", dependencies=[Depends(get_current_user)])
+@router.get("/districts")
 def list_districts(db: Session = Depends(get_db)):
     items = db.scalars(select(District).order_by(District.name.asc())).all()
     return [{"id": d.id, "name": d.name, "province_id": d.province_id} for d in items]
@@ -32,7 +32,7 @@ def create_stop(payload: GeometryEntityCreate, db: Session = Depends(get_db)):
     return {"id": item.id}
 
 
-@router.get("/stops", dependencies=[Depends(get_current_user)])
+@router.get("/stops")
 def list_stops(db: Session = Depends(get_db)):
     rows = db.execute(select(Stop.id, Stop.name, Stop.district_id, func.ST_AsText(Stop.geometry))).all()
     return [{"id": r[0], "name": r[1], "district_id": r[2], "geometry_wkt": r[3]} for r in rows]
@@ -69,7 +69,7 @@ def create_park(payload: GeometryEntityCreate, db: Session = Depends(get_db)):
     return {"id": item.id}
 
 
-@router.get("/parks", dependencies=[Depends(get_current_user)])
+@router.get("/parks")
 def list_parks(db: Session = Depends(get_db)):
     rows = db.execute(select(BusPark.id, BusPark.name, BusPark.district_id, func.ST_AsText(BusPark.geometry))).all()
     return [{"id": r[0], "name": r[1], "district_id": r[2], "geometry_wkt": r[3]} for r in rows]

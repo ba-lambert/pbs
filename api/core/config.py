@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     postgres_user: str = "postgres"
     postgres_password: str = "postgres"
     postgres_db: str = "pbs_db"
+    stripe_secret_key: str = ""
+    stripe_publishable_key: str = ""
 
 
 settings = Settings()

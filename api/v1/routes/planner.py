@@ -3,7 +3,6 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from api.core.database import get_db
-from api.deps import get_current_user
 from api.schemas import PlannerRequest
 from models.entities import BusPark, District, FareConfig, Route, Stop
 from utils.fare import calculate_linear_fare
@@ -35,7 +34,7 @@ def _resolve_location(db: Session, location_type: str, location_id: int) -> tupl
     return float(row[0]), float(row[1])
 
 
-@router.post("/plan", dependencies=[Depends(get_current_user)])
+@router.post("/plan")
 def plan_trip(payload: PlannerRequest, db: Session = Depends(get_db)):
     origin_lat, origin_lon = _resolve_location(db, payload.origin_type, payload.origin_id)
     destination_lat, destination_lon = _resolve_location(db, payload.destination_type, payload.destination_id)

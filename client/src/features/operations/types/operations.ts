@@ -58,6 +58,7 @@ export interface BusFormValues {
 
 export interface DriverFormValues {
   full_name: string
+  email: string
   gender: string
   bus_id: string
   district_id: string

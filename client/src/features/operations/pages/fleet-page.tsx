@@ -12,7 +12,7 @@ type FleetView = 'buses' | 'drivers'
 
 export function FleetPage() {
   const busForm = useForm<BusFormValues>({ defaultValues: { plate_number: '', model: '', capacity: 53, gps_imei: '' } })
-  const driverForm = useForm<DriverFormValues>({ defaultValues: { full_name: '', gender: '', bus_id: '', district_id: '', license_number: '', license_category: 'D', phone: '', profile_image: null } })
+  const driverForm = useForm<DriverFormValues>({ defaultValues: { full_name: '', email: '', gender: '', bus_id: '', district_id: '', license_number: '', license_category: 'D', phone: '', profile_image: null } })
 
   const [view, setView] = useState<FleetView>('buses')
   const [buses, setBuses] = useState<BusItem[]>([])
@@ -66,7 +66,7 @@ export function FleetPage() {
 
   const openCreateDriver = () => {
     setSelectedDriverId(null)
-    driverForm.reset({ full_name: '', gender: '', bus_id: '', district_id: '', license_number: '', license_category: 'D', phone: '', profile_image: null })
+    driverForm.reset({ full_name: '', email: '', gender: '', bus_id: '', district_id: '', license_number: '', license_category: 'D', phone: '', profile_image: null })
     setDriverDrawerOpen(true)
   }
 
@@ -75,6 +75,7 @@ export function FleetPage() {
     setSelectedCompanyId(item.company_id)
     driverForm.reset({
       full_name: item.full_name,
+      email: '',
       gender: item.gender ?? '',
       bus_id: item.bus_id ? String(item.bus_id) : '',
       district_id: item.district_id ? String(item.district_id) : '',
@@ -110,6 +111,7 @@ export function FleetPage() {
     try {
       const driverPayload = {
         company_id: selectedCompanyId,
+        email: payload.email || undefined,
         full_name: payload.full_name,
         gender: payload.gender || undefined,
         bus_id: payload.bus_id ? Number(payload.bus_id) : undefined,
@@ -304,6 +306,7 @@ export function FleetPage() {
           </div>
           <div className="grid gap-3 px-6 py-5">
             <label className="grid gap-1 text-sm"><span>Full name</span><Input {...driverForm.register('full_name', { required: true })} placeholder="e.g. Jean Pierre Habimana" /></label>
+            <label className="grid gap-1 text-sm"><span>Email (creates driver app login)</span><Input type="email" {...driverForm.register('email')} placeholder="driver@example.com" /></label>
             <label className="grid gap-1 text-sm"><span>Gender</span>
               <Select {...driverForm.register('gender')}>
                 <option value="">Select gender</option>

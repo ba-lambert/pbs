@@ -97,7 +97,9 @@ class BusCreate(BaseModel):
 
 class DriverCreate(BaseModel):
     company_id: int
-    user_id: int | None = None
+    full_name: str
+    gender: str | None = None
+    bus_id: int | None = None
     district_id: int | None = None
     license_number: str
     license_category: str | None = None

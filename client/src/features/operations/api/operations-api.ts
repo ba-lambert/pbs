@@ -60,7 +60,9 @@ export async function listDrivers() {
 
 type DriverPayload = {
   company_id: number
-  user_id?: number
+  full_name: string
+  gender?: string
+  bus_id?: number
   district_id?: number
   license_number: string
   license_category?: string
@@ -71,9 +73,11 @@ type DriverPayload = {
 function toDriverFormData(payload: DriverPayload) {
   const formData = new FormData()
   formData.set('company_id', String(payload.company_id))
+  formData.set('full_name', payload.full_name)
   formData.set('license_number', payload.license_number)
   formData.set('phone', payload.phone)
-  if (payload.user_id !== undefined) formData.set('user_id', String(payload.user_id))
+  if (payload.gender) formData.set('gender', payload.gender)
+  if (payload.bus_id !== undefined) formData.set('bus_id', String(payload.bus_id))
   if (payload.district_id !== undefined) formData.set('district_id', String(payload.district_id))
   if (payload.license_category) formData.set('license_category', payload.license_category)
   if (payload.profile_image) formData.set('profile_image', payload.profile_image)

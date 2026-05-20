@@ -27,7 +27,9 @@ export interface BusItem {
 export interface DriverItem {
   id: number
   company_id: number
-  user_id?: number | null
+  full_name: string
+  gender?: string | null
+  bus_id?: number | null
   district_id?: number | null
   license_number: string
   license_category?: string | null
@@ -55,7 +57,9 @@ export interface BusFormValues {
 }
 
 export interface DriverFormValues {
-  user_id: string
+  full_name: string
+  gender: string
+  bus_id: string
   district_id: string
   license_number: string
   license_category: string

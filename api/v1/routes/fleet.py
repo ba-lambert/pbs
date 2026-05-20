@@ -18,7 +18,9 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 async def _parse_driver_payload(
     request: Request,
     company_id: int | None,
-    user_id: int | None,
+    full_name: str | None,
+    gender: str | None,
+    bus_id: int | None,
     district_id: int | None,
     license_number: str | None,
     license_category: str | None,
@@ -31,7 +33,9 @@ async def _parse_driver_payload(
     return DriverCreate.model_validate(
         {
             "company_id": company_id,
-            "user_id": user_id,
+            "full_name": full_name,
+            "gender": gender,
+            "bus_id": bus_id,
             "district_id": district_id,
             "license_number": license_number,
             "license_category": license_category,
@@ -126,7 +130,9 @@ def assign_bus_districts(
 async def create_driver(
     request: Request,
     company_id: int | None = Form(default=None),
-    user_id: int | None = Form(default=None),
+    full_name: str | None = Form(default=None),
+    gender: str | None = Form(default=None),
+    bus_id: int | None = Form(default=None),
     district_id: int | None = Form(default=None),
     license_number: str | None = Form(default=None),
     license_category: str | None = Form(default=None),
@@ -139,7 +145,9 @@ async def create_driver(
     payload = await _parse_driver_payload(
         request=request,
         company_id=company_id,
-        user_id=user_id,
+        full_name=full_name,
+        gender=gender,
+        bus_id=bus_id,
         district_id=district_id,
         license_number=license_number,
         license_category=license_category,
@@ -152,7 +160,9 @@ async def create_driver(
         image_url = _save_driver_image(profile_image)
     item = Driver(
         company_id=payload.company_id,
-        user_id=payload.user_id,
+        full_name=payload.full_name,
+        gender=payload.gender,
+        bus_id=payload.bus_id,
         district_id=payload.district_id,
         license_number=payload.license_number,
         license_category=payload.license_category,
@@ -176,8 +186,10 @@ def list_drivers(db: Session = Depends(get_db), current_user: User = Depends(get
         {
             "id": i.id,
             "company_id": i.company_id,
+            "full_name": i.full_name,
+            "gender": i.gender,
+            "bus_id": i.bus_id,
             "license_number": i.license_number,
-            "user_id": i.user_id,
             "district_id": i.district_id,
             "license_category": i.license_category,
             "phone": i.phone,
@@ -192,7 +204,9 @@ async def update_driver(
     driver_id: int,
     request: Request,
     company_id: int | None = Form(default=None),
-    user_id: int | None = Form(default=None),
+    full_name: str | None = Form(default=None),
+    gender: str | None = Form(default=None),
+    bus_id: int | None = Form(default=None),
     district_id: int | None = Form(default=None),
     license_number: str | None = Form(default=None),
     license_category: str | None = Form(default=None),
@@ -205,7 +219,9 @@ async def update_driver(
     payload = await _parse_driver_payload(
         request=request,
         company_id=company_id,
-        user_id=user_id,
+        full_name=full_name,
+        gender=gender,
+        bus_id=bus_id,
         district_id=district_id,
         license_number=license_number,
         license_category=license_category,
@@ -217,7 +233,9 @@ async def update_driver(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found")
     enforce_company_scope(current_user, item.company_id)
     item.company_id = payload.company_id
-    item.user_id = payload.user_id
+    item.full_name = payload.full_name
+    item.gender = payload.gender
+    item.bus_id = payload.bus_id
     item.district_id = payload.district_id
     item.license_number = payload.license_number
     item.license_category = payload.license_category

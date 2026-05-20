@@ -2,22 +2,21 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { FiFilter, FiPlus, FiSettings } from 'react-icons/fi'
 import { Button, Card, Drawer, Input, Select, Table, TableCell, TableHead, TableHeader, TableRow, TableWrap } from '../../../shared/ui'
-import { createBus, createDriver, deleteBus, deleteDriver, listBuses, listDrivers, listUsers, updateBus, updateDriver } from '../api/operations-api'
+import { createBus, createDriver, deleteBus, deleteDriver, listBuses, listDrivers, updateBus, updateDriver } from '../api/operations-api'
 import { getErrorMessage } from '../../../shared/lib/error-message'
 import { useCompanyScope } from '../hooks/use-company-scope'
-import type { BusFormValues, BusItem, DriverFormValues, DriverItem, UserItem } from '../types/operations'
+import type { BusFormValues, BusItem, DriverFormValues, DriverItem } from '../types/operations'
 import { listDistricts } from '../../geography/api/geography-api'
 
 type FleetView = 'buses' | 'drivers'
 
 export function FleetPage() {
   const busForm = useForm<BusFormValues>({ defaultValues: { plate_number: '', model: '', capacity: 53, gps_imei: '' } })
-  const driverForm = useForm<DriverFormValues>({ defaultValues: { user_id: '', district_id: '', license_number: '', license_category: 'D', phone: '', profile_image: null } })
+  const driverForm = useForm<DriverFormValues>({ defaultValues: { full_name: '', gender: '', bus_id: '', district_id: '', license_number: '', license_category: 'D', phone: '', profile_image: null } })
 
   const [view, setView] = useState<FleetView>('buses')
   const [buses, setBuses] = useState<BusItem[]>([])
   const [drivers, setDrivers] = useState<DriverItem[]>([])
-  const [users, setUsers] = useState<UserItem[]>([])
   const [selectedBusId, setSelectedBusId] = useState<number | null>(null)
   const [selectedDriverId, setSelectedDriverId] = useState<number | null>(null)
   const [busDrawerOpen, setBusDrawerOpen] = useState(false)
@@ -34,10 +33,9 @@ export function FleetPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const [busData, driverData, userData, districtData] = await Promise.all([listBuses(), listDrivers(), listUsers(), listDistricts()])
+      const [busData, driverData, districtData] = await Promise.all([listBuses(), listDrivers(), listDistricts()])
       setBuses(busData)
       setDrivers(driverData)
-      setUsers(userData)
       setDistricts(districtData.map((item) => ({ id: item.id, name: item.name })))
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to load fleet'))
@@ -52,7 +50,6 @@ export function FleetPage() {
 
   const scopedBuses = useMemo(() => (selectedCompanyId ? buses.filter((item) => item.company_id === selectedCompanyId) : buses), [buses, selectedCompanyId])
   const scopedDrivers = useMemo(() => (selectedCompanyId ? drivers.filter((item) => item.company_id === selectedCompanyId) : drivers), [drivers, selectedCompanyId])
-  const scopedUsers = useMemo(() => (selectedCompanyId ? users.filter((item) => item.company_id === selectedCompanyId) : users), [users, selectedCompanyId])
 
   const openCreateBus = () => {
     setSelectedBusId(null)
@@ -69,7 +66,7 @@ export function FleetPage() {
 
   const openCreateDriver = () => {
     setSelectedDriverId(null)
-    driverForm.reset({ user_id: '', district_id: '', license_number: '', license_category: 'D', phone: '', profile_image: null })
+    driverForm.reset({ full_name: '', gender: '', bus_id: '', district_id: '', license_number: '', license_category: 'D', phone: '', profile_image: null })
     setDriverDrawerOpen(true)
   }
 
@@ -77,7 +74,9 @@ export function FleetPage() {
     setSelectedDriverId(item.id)
     setSelectedCompanyId(item.company_id)
     driverForm.reset({
-      user_id: item.user_id ? String(item.user_id) : '',
+      full_name: item.full_name,
+      gender: item.gender ?? '',
+      bus_id: item.bus_id ? String(item.bus_id) : '',
       district_id: item.district_id ? String(item.district_id) : '',
       license_number: item.license_number,
       license_category: item.license_category ?? 'D',
@@ -109,10 +108,11 @@ export function FleetPage() {
     setIsMutating(true)
     setError(null)
     try {
-      const parsedUserId = Number(payload.user_id)
       const driverPayload = {
         company_id: selectedCompanyId,
-        user_id: Number.isNaN(parsedUserId) ? undefined : parsedUserId,
+        full_name: payload.full_name,
+        gender: payload.gender || undefined,
+        bus_id: payload.bus_id ? Number(payload.bus_id) : undefined,
         district_id: payload.district_id ? Number(payload.district_id) : undefined,
         license_number: payload.license_number,
         license_category: payload.license_category || undefined,
@@ -232,12 +232,12 @@ export function FleetPage() {
             <Table>
               <TableHead>
                 <TableRow className="hover:bg-transparent">
-                  <TableHeader>ID</TableHeader>
+                  <TableHeader>Name</TableHeader>
+                  <TableHeader>Gender</TableHeader>
+                  <TableHeader>Phone</TableHeader>
                   <TableHeader>License</TableHeader>
                   <TableHeader>Category</TableHeader>
-                  <TableHeader>Place</TableHeader>
-                  <TableHeader>Phone</TableHeader>
-                  <TableHeader>Company</TableHeader>
+                  <TableHeader>Bus</TableHeader>
                   <TableHeader>Status</TableHeader>
                   <TableHeader />
                 </TableRow>
@@ -245,12 +245,12 @@ export function FleetPage() {
               <tbody>
                 {scopedDrivers.map((item) => (
                   <TableRow key={item.id}>
-                    <TableCell>#{item.id}</TableCell>
-                    <TableCell className="font-semibold text-zinc-900">{item.license_number}</TableCell>
-                    <TableCell>{item.license_category ?? 'D'}</TableCell>
-                    <TableCell>{item.district_id ? `#${item.district_id}` : '—'}</TableCell>
+                    <TableCell className="font-semibold text-zinc-900">{item.full_name}</TableCell>
+                    <TableCell className="capitalize">{item.gender ?? '—'}</TableCell>
                     <TableCell>{item.phone}</TableCell>
-                    <TableCell>#{item.company_id}</TableCell>
+                    <TableCell>{item.license_number}</TableCell>
+                    <TableCell>{item.license_category ?? 'D'}</TableCell>
+                    <TableCell>{item.bus_id ? `B-${item.bus_id}` : '—'}</TableCell>
                     <TableCell>
                       <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-700">
                         <span className="size-2 rounded-full bg-blue-500" /> Assigned
@@ -303,10 +303,19 @@ export function FleetPage() {
             <h3 className="text-2xl font-semibold text-zinc-900">{selectedDriverId ? 'Edit driver' : 'Add driver'}</h3>
           </div>
           <div className="grid gap-3 px-6 py-5">
-            <label className="grid gap-1 text-sm"><span>Linked user</span>
-              <Select {...driverForm.register('user_id')}>
-                <option value="">No linked account</option>
-                {scopedUsers.map((user) => <option key={user.id} value={user.id}>#{user.id} {user.full_name}</option>)}
+            <label className="grid gap-1 text-sm"><span>Full name</span><Input {...driverForm.register('full_name', { required: true })} placeholder="e.g. Jean Pierre Habimana" /></label>
+            <label className="grid gap-1 text-sm"><span>Gender</span>
+              <Select {...driverForm.register('gender')}>
+                <option value="">Select gender</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </Select>
+            </label>
+            <label className="grid gap-1 text-sm"><span>Phone</span><Input {...driverForm.register('phone', { required: true })} placeholder="+250 7XX XXX XXX" /></label>
+            <label className="grid gap-1 text-sm"><span>Assigned bus</span>
+              <Select {...driverForm.register('bus_id')}>
+                <option value="">No bus assigned</option>
+                {scopedBuses.map((bus) => <option key={bus.id} value={bus.id}>B-{bus.id} · {bus.plate_number} ({bus.model})</option>)}
               </Select>
             </label>
             <label className="grid gap-1 text-sm"><span>Place (District)</span>
@@ -316,9 +325,8 @@ export function FleetPage() {
               </Select>
             </label>
             <label className="grid gap-1 text-sm"><span>License number</span><Input {...driverForm.register('license_number', { required: true })} /></label>
-            <label className="grid gap-1 text-sm"><span>Category</span><Input {...driverForm.register('license_category')} /></label>
-            <label className="grid gap-1 text-sm"><span>Phone</span><Input {...driverForm.register('phone', { required: true })} /></label>
-            <label className="grid gap-1 text-sm"><span>Profile image</span><Input type="file" accept="image/*" {...driverForm.register('profile_image')} /></label>
+            <label className="grid gap-1 text-sm"><span>License category</span><Input {...driverForm.register('license_category')} placeholder="D" /></label>
+            <label className="grid gap-1 text-sm"><span>Profile photo</span><Input type="file" accept="image/*" {...driverForm.register('profile_image')} /></label>
           </div>
           <div className="mt-auto flex justify-end gap-2 border-t border-zinc-200 px-6 py-4">
             <Button type="button" className="bg-zinc-100 text-zinc-900 hover:bg-zinc-200" onClick={() => setDriverDrawerOpen(false)}>Cancel</Button>

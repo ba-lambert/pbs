@@ -1,6 +1,6 @@
 services:
   pbs_postgres:
-    image: postgis/postgis:17-3.5
+    image: docker.io/postgis/postgis:17-3.5
     container_name: pbs_postgres
     restart: unless-stopped
     environment:

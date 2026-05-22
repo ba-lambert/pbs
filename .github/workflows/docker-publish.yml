@@ -131,6 +131,9 @@ jobs:
             set -e
             mkdir -p ~/pbs
 
+            # Allow rootless Podman to bind port 80 (requires sudo; skipped if unavailable)
+            sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80 2>/dev/null || true
+
             # Generate DB password and JWT secret once, reuse on every subsequent deploy
             if [ ! -f ~/pbs/.secrets ]; then
               echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)" >  ~/pbs/.secrets

@@ -112,7 +112,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           source: docker-compose.prod.yml
-          target: /opt/pbs
+          target: ~/pbs
 
       - name: Deploy on VPS
         uses: appleboy/ssh-action@v1.2.0
@@ -128,31 +128,31 @@ jobs:
           envs: STRIPE_SECRET_KEY,STRIPE_PUBLISHABLE_KEY,GHCR_TOKEN,GITHUB_ACTOR
           script: |
             set -e
-            mkdir -p /opt/pbs
+            mkdir -p ~/pbs
 
             # Generate DB password and JWT secret once, reuse on every subsequent deploy
-            if [ ! -f /opt/pbs/.secrets ]; then
-              echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)" >  /opt/pbs/.secrets
-              echo "JWT_SECRET=$(openssl rand -hex 32)"        >> /opt/pbs/.secrets
-              chmod 600 /opt/pbs/.secrets
+            if [ ! -f ~/pbs/.secrets ]; then
+              echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)" >  ~/pbs/.secrets
+              echo "JWT_SECRET=$(openssl rand -hex 32)"        >> ~/pbs/.secrets
+              chmod 600 ~/pbs/.secrets
             fi
-            source /opt/pbs/.secrets
+            source ~/pbs/.secrets
 
             # Write env file (Stripe comes from GitHub secrets, rest from .secrets)
-            cat > /opt/pbs/.env << EOF
+            cat > ~/pbs/.env << EOF
             POSTGRES_USER=postgres
             POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
             JWT_SECRET=${JWT_SECRET}
             STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
             STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
             EOF
-            chmod 600 /opt/pbs/.env
+            chmod 600 ~/pbs/.env
 
             # Log in to GHCR using the workflow's GITHUB_TOKEN (valid for this run)
             echo "${GHCR_TOKEN}" | podman login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
 
             # Pull latest images and restart
-            cd /opt/pbs
+            cd ~/pbs
             podman-compose -f docker-compose.prod.yml pull
             podman-compose -f docker-compose.prod.yml up -d --remove-orphans
 

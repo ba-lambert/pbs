@@ -32,6 +32,8 @@ services:
       POSTGRES_DB: pbs_db
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+    ports:
+      - "8000:8000"
     volumes:
       - pbs_uploads:/app/uploads
     networks:

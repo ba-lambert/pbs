@@ -3,10 +3,21 @@ import { Stack, useRouter, useSegments } from 'expo-router'
 import { useCallback, useEffect, useState } from 'react'
 import { StripeProvider } from '@stripe/stripe-react-native'
 import { StatusBar } from 'expo-status-bar'
-import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { View } from 'react-native'
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AuthContext, type AuthUser, clearAuth, loadStoredUser, persistMustChangePasswordCleared, saveAuth } from '@/lib/auth-store'
 import { queryClient } from '@/lib/query-client'
 import type { AuthResponse } from '@/lib/api'
+
+function StatusBarBackground() {
+  const insets = useSafeAreaInsets()
+  return (
+    <View
+      pointerEvents="none"
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top, backgroundColor: '#0f172a', zIndex: 999 }}
+    />
+  )
+}
 
 export default function RootLayout() {
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -67,6 +78,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <StripeProvider publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? ''} merchantIdentifier="merchant.com.pbs.rw">
         <StatusBar style="light" backgroundColor="#0f172a" translucent={false} />
+        <StatusBarBackground />
         <QueryClientProvider client={queryClient}>
           <AuthContext.Provider value={{ user, isLoading, signIn, signOut, clearMustChangePassword }}>
             <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0f172a' } }}>

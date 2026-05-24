@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons'
 import { useStripe } from '@stripe/stripe-react-native'
 import { useQuery } from '@tanstack/react-query'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router'
 import { useState } from 'react'
 import {
   ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform,
@@ -20,6 +20,7 @@ export default function TripDetailScreen() {
       destType?: string;   destId?: string;   destName?: string
     }>()
   const router = useRouter()
+  const navigation = useNavigation()
   const { user } = useAuth()
 
   const { initPaymentSheet, presentPaymentSheet } = useStripe()
@@ -46,7 +47,7 @@ export default function TripDetailScreen() {
       Alert.alert(
         'Select your journey',
         'Go back to the search screen and choose your boarding and alighting location to calculate the fare and pay.',
-        [{ text: 'OK', onPress: () => router.back() }],
+        [{ text: 'OK', onPress: () => navigation.canGoBack() ? router.back() : router.replace('/(tabs)') }],
       )
       return
     }

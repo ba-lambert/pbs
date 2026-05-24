@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons'
-import { useRouter } from 'expo-router'
+import { useNavigation, useRouter } from 'expo-router'
 import { useState } from 'react'
 import {
   ActivityIndicator, ImageBackground, KeyboardAvoidingView,
@@ -15,6 +15,8 @@ const BG_IMAGE = { uri: 'https://www.ktpress.rw/wp-content/uploads/2019/10/Ritco
 export default function SignUpScreen() {
   const { signIn } = useAuth()
   const router = useRouter()
+  const navigation = useNavigation()
+  const goBack = () => navigation.canGoBack() ? router.back() : router.replace('/(tabs)')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -43,7 +45,7 @@ export default function SignUpScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-            <Pressable style={s.closeBtn} onPress={() => router.back()}>
+            <Pressable style={s.closeBtn} onPress={goBack}>
               <Feather name="x" size={20} color="#fff" />
             </Pressable>
 

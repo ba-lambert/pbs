@@ -8,6 +8,7 @@ import { GeographyPage } from '../../features/geography/pages/geography-page'
 import { CompaniesPage, FleetPage, UsersPage, PricingPage } from '../../features/operations'
 import { DashboardOverview, TripsPage } from '../routes/operations-pages'
 import { DriverDashboardPage } from '../../features/driver/pages/driver-dashboard-page'
+import { TrackingPage } from '../../features/tracking/pages/tracking-page'
 
 const rootRoute = createRootRoute({
   component: RootLayout,
@@ -51,15 +52,16 @@ const overviewRoute = createRoute({
 const companiesRoute = createRoute({ getParentRoute: () => dashboardRoute, path: '/companies', component: CompaniesPage })
 const usersRoute = createRoute({ getParentRoute: () => dashboardRoute, path: '/users', component: UsersPage })
 const geographyRoute = createRoute({ getParentRoute: () => dashboardRoute, path: '/geography', component: GeographyPage })
-const fleetRoute = createRoute({ getParentRoute: () => dashboardRoute, path: '/fleet', component: FleetPage })
-const tripsRoute = createRoute({ getParentRoute: () => dashboardRoute, path: '/trips', component: TripsPage })
-const pricingRoute = createRoute({ getParentRoute: () => dashboardRoute, path: '/pricing', component: PricingPage })
+const fleetRoute    = createRoute({ getParentRoute: () => dashboardRoute, path: '/fleet',    component: FleetPage })
+const tripsRoute    = createRoute({ getParentRoute: () => dashboardRoute, path: '/trips',    component: TripsPage })
+const pricingRoute  = createRoute({ getParentRoute: () => dashboardRoute, path: '/pricing',  component: PricingPage })
+const trackingRoute = createRoute({ getParentRoute: () => dashboardRoute, path: '/tracking', component: TrackingPage })
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
   driverRoute,
-  dashboardRoute.addChildren([overviewRoute, companiesRoute, usersRoute, geographyRoute, fleetRoute, tripsRoute, pricingRoute]),
+  dashboardRoute.addChildren([overviewRoute, companiesRoute, usersRoute, geographyRoute, fleetRoute, tripsRoute, pricingRoute, trackingRoute]),
 ])
 
 export const router = createRouter({ routeTree })

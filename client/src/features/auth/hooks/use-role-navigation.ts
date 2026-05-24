@@ -13,6 +13,7 @@ const NAV_ITEMS: SidebarNavItem[] = [
   { to: '/dashboard/geography', label: 'Stops/Parks/Routes', roles: ['super_admin', 'company_admin', 'company_operator'] },
   { to: '/dashboard/fleet', label: 'Buses/Drivers', roles: ['super_admin', 'company_admin', 'company_operator'] },
   { to: '/dashboard/trips', label: 'Trips', roles: ['super_admin', 'company_admin', 'company_operator'] },
+  { to: '/dashboard/tracking', label: 'Live Tracking', roles: ['super_admin', 'company_admin', 'company_operator'] },
   { to: '/dashboard/pricing', label: 'Fare Settings', roles: ['super_admin'] },
 ]
 

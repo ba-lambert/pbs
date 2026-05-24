@@ -1,6 +1,28 @@
 import { apiClient } from '../../../shared/api/client'
 import type { BusFormValues, BusItem, CompanyFormValues, CompanyItem, DriverItem, UserFormValues, UserItem } from '../types/operations'
 
+export type FleetVehicle = {
+  bus_id: number
+  plate_number: string
+  model: string
+  company_id: number
+  company_name: string
+  trip_id: number | null
+  route_name: string | null
+  driver_name: string | null
+  latitude: number | null
+  longitude: number | null
+  speed_kmh: number | null
+  route_coords: [number, number][] | null
+  simulated: boolean
+  has_active_trip: boolean
+}
+
+export async function getFleetPositions(): Promise<FleetVehicle[]> {
+  const res = await apiClient.get<FleetVehicle[]>('/tracking/fleet')
+  return res.data
+}
+
 export async function listCompanies() {
   const response = await apiClient.get<CompanyItem[]>('/companies')
   return response.data

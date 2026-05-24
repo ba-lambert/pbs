@@ -175,3 +175,13 @@ class PlannerRequest(BaseModel):
     origin_id: int
     destination_type: str
     destination_id: int
+
+
+class SimulateRequest(BaseModel):
+    imei: str = Field(..., description="GPS IMEI of the bus to simulate")
+    origin_lat: float = Field(..., description="Boarding point latitude")
+    origin_lon: float = Field(..., description="Boarding point longitude")
+    dest_lat: float = Field(..., description="Destination latitude")
+    dest_lon: float = Field(..., description="Destination longitude")
+    speed_kmh: float = Field(60.0, description="Simulated speed in km/h")
+    interval_s: float = Field(5.0, description="Seconds between GPS pings")

@@ -2,7 +2,7 @@ import { Feather } from '@expo/vector-icons'
 import { useQuery } from '@tanstack/react-query'
 import { ActivityIndicator, Image, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import type { BoardingStop, DriverTrip, TripWithPassengers } from '@/lib/api'
+import type { BoardingStop, DriverTrip, TripPassenger, TripWithPassengers } from '@/lib/api'
 import { tripsApi } from '@/lib/api'
 import { Brand, Spacing } from '@/constants/theme'
 
@@ -97,15 +97,15 @@ export default function PassengersScreen() {
   )
 }
 
-type Passenger = StopPassengers['passengers'][number]
-
-function PassengerRow({ passenger }: { passenger: Passenger }) {
+function PassengerRow({ passenger }: { passenger: TripPassenger }) {
   const initials = passenger.full_name
     .split(' ')
     .map((n) => n[0])
     .join('')
     .toUpperCase()
     .slice(0, 2)
+
+  const contact = passenger.passenger_email || passenger.guest_phone
 
   return (
     <View style={s.row}>
@@ -121,14 +121,23 @@ function PassengerRow({ passenger }: { passenger: Passenger }) {
       )}
       <View style={s.rowInfo}>
         <Text style={s.passengerName}>{passenger.full_name}</Text>
-        {passenger.phone ? (
+        {contact ? (
           <View style={s.phoneRow}>
-            <Feather name="phone" size={12} color="#94a3b8" />
-            <Text style={s.passengerPhone}>{passenger.phone}</Text>
+            <Feather name={passenger.passenger_email ? 'mail' : 'phone'} size={12} color="#94a3b8" />
+            <Text style={s.passengerPhone}>{contact}</Text>
           </View>
         ) : null}
+        <View style={s.destRow}>
+          <Feather name="map-pin" size={12} color="#94a3b8" />
+          <Text style={s.destText}>To: {passenger.destination}</Text>
+        </View>
       </View>
-      <View style={s.bookingBadge}>
+      <View style={s.rightCol}>
+        {passenger.seat_number ? (
+          <View style={s.seatBadge}>
+            <Text style={s.seatText}>{passenger.seat_number}</Text>
+          </View>
+        ) : null}
         <Text style={s.bookingId}>#{passenger.booking_id}</Text>
       </View>
     </View>
@@ -168,7 +177,11 @@ const s = StyleSheet.create({
   passengerName: { fontSize: 15, fontWeight: '700', color: Brand.navy },
   phoneRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   passengerPhone: { fontSize: 13, color: '#64748b' },
-  bookingBadge: { backgroundColor: '#f1f5f9', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  destRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  destText: { fontSize: 12, color: '#64748b' },
+  rightCol: { alignItems: 'flex-end', gap: 4 },
+  seatBadge: { backgroundColor: Brand.green, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  seatText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   bookingId: { fontSize: 11, color: '#94a3b8', fontWeight: '600' },
 
   emptyState: { alignItems: 'center', paddingVertical: 80, gap: Spacing.two },

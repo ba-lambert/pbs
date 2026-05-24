@@ -51,7 +51,7 @@ def _trip_detail(trip: Trip, db: Session, include_passengers: bool = False) -> d
     if include_passengers:
         bookings = db.execute(
             select(Booking, User, Stop, BusPark)
-            .join(User, User.id == Booking.passenger_id)
+            .outerjoin(User, User.id == Booking.passenger_id)   # outer: include guests
             .outerjoin(Stop, Stop.id == Booking.origin_stop_id)
             .outerjoin(BusPark, BusPark.id == Booking.origin_park_id)
             .where(Booking.trip_id == trip.id)
@@ -62,18 +62,25 @@ def _trip_detail(trip: Trip, db: Session, include_passengers: bool = False) -> d
         for booking, user, stop, park in bookings:
             key = f"stop_{stop.id}" if stop else (f"park_{park.id}" if park else "none")
             if key not in stops:
-                board_name = stop.name if stop else (park.name if park else "No location")
+                board_name = stop.name if stop else (park.name if park else "Whole route")
                 stops[key] = {"location_name": board_name, "passengers": []}
             dest_stop = db.get(Stop, booking.destination_stop_id) if booking.destination_stop_id else None
             dest_park = db.get(BusPark, booking.destination_park_id) if booking.destination_park_id else None
             dest_dist = db.get(District, booking.destination_district_id) if booking.destination_district_id else None
-            dest_name = (dest_stop.name if dest_stop else None) or (dest_park.name if dest_park else None) or (dest_dist.name if dest_dist else "Unknown")
+            dest_name = (
+                (dest_stop.name if dest_stop else None)
+                or (dest_park.name if dest_park else None)
+                or (dest_dist.name if dest_dist else None)
+                or "End of route"
+            )
+            full_name = (user.full_name if user else None) or booking.guest_name or "Guest"
             stops[key]["passengers"].append({
                 "booking_id": booking.id,
                 "seat_number": booking.seat_number,
-                "full_name": user.full_name,
+                "full_name": full_name,
                 "passenger_email": booking.passenger_email,
-                "profile_image_url": user.profile_image_url,
+                "profile_image_url": user.profile_image_url if user else None,
+                "guest_phone": booking.guest_phone,
                 "destination": dest_name,
                 "fare_rwf": booking.fare_rwf,
             })

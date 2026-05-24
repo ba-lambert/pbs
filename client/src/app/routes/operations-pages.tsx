@@ -49,6 +49,7 @@ type BoardingStop = {
     seat_number: number | null
     full_name: string
     passenger_email: string | null
+    guest_phone: string | null
     destination: string
     fare_rwf: number
   }>
@@ -444,8 +445,12 @@ export function TripsPage() {
                       </span>
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-zinc-900 truncate">{p.full_name}</p>
-                        <p className="text-xs text-zinc-400">Seat {p.seat_number ?? '?'} · to {p.destination}</p>
-                        {p.passenger_email ? <p className="text-xs text-zinc-400 truncate">{p.passenger_email}</p> : null}
+                        <p className="text-xs text-zinc-400">
+                          {p.seat_number ? `Seat ${p.seat_number} · ` : ''}To: {p.destination}
+                        </p>
+                        {(p.passenger_email || p.guest_phone) ? (
+                          <p className="text-xs text-zinc-400 truncate">{p.passenger_email ?? p.guest_phone}</p>
+                        ) : null}
                       </div>
                       <span className="text-sm font-semibold text-emerald-700 shrink-0">{Number(p.fare_rwf).toLocaleString()} RWF</span>
                     </div>

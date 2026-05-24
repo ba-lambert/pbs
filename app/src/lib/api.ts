@@ -120,6 +120,7 @@ export type TripPassenger = {
   full_name: string
   passenger_email: string | null
   profile_image_url: string | null
+  guest_phone: string | null
   destination: string
   fare_rwf: number
 }

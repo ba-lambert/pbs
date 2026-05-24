@@ -56,3 +56,12 @@ export async function clearAuth() {
   await SecureStore.deleteItemAsync('refresh_token')
   await SecureStore.deleteItemAsync('user')
 }
+
+export async function persistMustChangePasswordCleared() {
+  const raw = await SecureStore.getItemAsync('user')
+  if (!raw) return
+  try {
+    const u = JSON.parse(raw) as AuthUser
+    await SecureStore.setItemAsync('user', JSON.stringify({ ...u, must_change_password: false }))
+  } catch {}
+}

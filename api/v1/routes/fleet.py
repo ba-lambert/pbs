@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import secrets
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -205,7 +205,6 @@ async def create_driver(
             company_id=payload.company_id,
             is_active=True,
             must_change_password=True,
-            password_expires_at=datetime.now(UTC) + timedelta(minutes=5),
         )
         db.add(driver_user)
         db.flush()

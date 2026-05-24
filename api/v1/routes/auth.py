@@ -51,11 +51,6 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is inactive")
-    if user.must_change_password and user.password_expires_at and user.password_expires_at < datetime.now(UTC):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Temporary password expired. Contact your administrator to reset it.",
-        )
     return _issue_tokens(db, user)
 
 

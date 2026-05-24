@@ -167,13 +167,16 @@ class FareConfig(Base):
 class Booking(Base):
     __tablename__ = "bookings"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    passenger_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    passenger_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    guest_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     trip_id: Mapped[int] = mapped_column(ForeignKey("trips.id", ondelete="CASCADE"), index=True)
     origin_stop_id: Mapped[int | None] = mapped_column(ForeignKey("stops.id", ondelete="SET NULL"), nullable=True)
     origin_park_id: Mapped[int | None] = mapped_column(ForeignKey("bus_parks.id", ondelete="SET NULL"), nullable=True)
     destination_stop_id: Mapped[int | None] = mapped_column(ForeignKey("stops.id", ondelete="SET NULL"), nullable=True)
     destination_park_id: Mapped[int | None] = mapped_column(ForeignKey("bus_parks.id", ondelete="SET NULL"), nullable=True)
     destination_district_id: Mapped[int | None] = mapped_column(ForeignKey("districts.id", ondelete="SET NULL"), nullable=True)
+    passenger_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    seat_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     distance_km: Mapped[float] = mapped_column(Float)
     fare_rwf: Mapped[float] = mapped_column(Float)
     status: Mapped[str] = mapped_column(String(40), default="booked")

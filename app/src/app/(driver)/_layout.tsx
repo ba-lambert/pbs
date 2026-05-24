@@ -36,6 +36,13 @@ export default function DriverTabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="trips"
+        options={{
+          title: 'My Trips',
+          tabBarIcon: ({ color, size }) => <Feather name="list" size={size ?? 22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="passengers"
         options={{
           title: 'Passengers',

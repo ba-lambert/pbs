@@ -152,6 +152,8 @@ class BookingCreate(BaseModel):
     destination_park_id: int | None = None
     destination_district_id: int | None = None
     payment_intent_id: str | None = None
+    passenger_email: str | None = None
+    guest_name: str | None = None
 
 
 class FareConfigUpdate(BaseModel):

@@ -95,29 +95,46 @@ export type AvailableTrip = {
 
 export type DriverTrip = {
   id: number
-  route_name: string
+  route_id: number
+  route_name: string | null
   route_geometry: string | null
-  bus_capacity: number
-  bus_model: string
-  bus_plate: string
+  bus_id: number
+  bus_capacity: number | null
+  bus_model: string | null
+  bus_plate: string | null
+  driver_name: string | null
+  driver_phone: string | null
   departure_at: string
   arrival_at: string | null
   duration_minutes: number | null
   status: string
   passenger_count: number
+  available_seats: number
 }
 
-export type StopPassengers = {
-  stop_id: number | null
-  stop_name: string
-  passengers: Array<{ booking_id: number; full_name: string; phone: string | null; profile_image_url: string | null }>
+export type TripPassenger = {
+  booking_id: number
+  seat_number: number | null
+  full_name: string
+  passenger_email: string | null
+  profile_image_url: string | null
+  destination: string
+  fare_rwf: number
 }
+
+export type BoardingStop = {
+  location_name: string
+  passengers: TripPassenger[]
+}
+
+export type TripWithPassengers = DriverTrip & { boarding_stops: BoardingStop[] }
 
 export const tripsApi = {
   available: (route_id?: number) =>
     api.get<AvailableTrip[]>(`/trips/available${route_id ? `?route_id=${route_id}` : ''}`),
   driverActive: () => api.get<DriverTrip | null>('/trips/driver/active'),
-  passengers: (trip_id: number) => api.get<StopPassengers[]>(`/trips/${trip_id}/passengers`),
+  driverMyTrips: () => api.get<DriverTrip[]>('/trips/driver/my-trips'),
+  passengers: (trip_id: number) => api.get<TripWithPassengers>(`/trips/${trip_id}/passengers`),
 }
 
 // --- Bookings ---
@@ -134,10 +151,15 @@ export const bookingsApi = {
   list: () => api.get<Booking[]>('/bookings'),
   create: (payload: {
     trip_id: number
+    passenger_email?: string
+    guest_name?: string
     origin_stop_id?: number
+    origin_park_id?: number
+    destination_stop_id?: number
+    destination_park_id?: number
     destination_district_id?: number
     payment_intent_id?: string
-  }) => api.post<{ id: number; fare_rwf: number; payment_status: string }>('/bookings', payload),
+  }) => api.post<{ id: number; fare_rwf: number; seat_number: number | null; payment_status: string; remaining_seats: number }>('/bookings', payload),
 }
 
 // --- Payments ---

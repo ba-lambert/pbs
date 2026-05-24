@@ -168,7 +168,25 @@ export default function PlannerScreen() {
             keyExtractor={(t) => String(t.id)}
             scrollEnabled={false}
             renderItem={({ item }) => (
-              <TripCard trip={item} onPress={() => router.push(`/(tabs)/trip/${item.id}`)} />
+              <TripCard
+                trip={item}
+                estimatedFare={planResult?.estimated_fare_rwf}
+                distanceKm={planResult?.distance_km}
+                onPress={() =>
+                  router.push({
+                    pathname: '/trip/[id]',
+                    params: {
+                      id: item.id,
+                      originType: origin?.type,
+                      originId:   origin?.id,
+                      originName: origin?.name,
+                      destType:   dest?.type,
+                      destId:     dest?.id,
+                      destName:   dest?.name,
+                    },
+                  })
+                }
+              />
             )}
             ItemSeparatorComponent={() => <View style={{ height: Spacing.two }} />}
           />
@@ -325,7 +343,12 @@ function LocationPicker({
 
 // ─── Trip Card ────────────────────────────────────────────────────────────────
 
-function TripCard({ trip, onPress }: { trip: AvailableTrip; onPress: () => void }) {
+function TripCard({ trip, onPress, estimatedFare, distanceKm }: {
+  trip: AvailableTrip
+  onPress: () => void
+  estimatedFare?: number
+  distanceKm?: number
+}) {
   const dep = new Date(trip.departure_at)
   const full = trip.available_seats === 0
   const timeStr = dep.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -345,6 +368,14 @@ function TripCard({ trip, onPress }: { trip: AvailableTrip; onPress: () => void 
           <Text style={s.cardMetaText}>{dateStr} · {timeStr}</Text>
         </View>
         <Text style={s.cardBus}>{trip.bus_model} · {trip.bus_plate}</Text>
+        {estimatedFare ? (
+          <View style={s.farePillRow}>
+            <View style={s.cardFarePill}>
+              <Text style={s.cardFareText}>{Math.round(estimatedFare).toLocaleString()} RWF</Text>
+            </View>
+            {distanceKm ? <Text style={s.cardDistText}>{distanceKm.toFixed(1)} km</Text> : null}
+          </View>
+        ) : null}
       </View>
       <View style={s.cardRight}>
         <View style={[s.seatBadge, full && s.seatBadgeFull]}>
@@ -429,6 +460,11 @@ const s = StyleSheet.create({
   seatNum: { fontSize: 18, fontWeight: '800', color: Brand.green },
   seatNumFull: { color: '#dc2626' },
   seatLabel: { fontSize: 10, color: '#94a3b8', fontWeight: '500' },
+
+  farePillRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
+  cardFarePill: { backgroundColor: Brand.greenLight, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  cardFareText: { fontSize: 12, fontWeight: '700', color: Brand.green },
+  cardDistText: { fontSize: 11, color: '#94a3b8' },
 })
 
 const m = StyleSheet.create({

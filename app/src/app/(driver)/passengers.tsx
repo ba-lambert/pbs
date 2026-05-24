@@ -2,7 +2,7 @@ import { Feather } from '@expo/vector-icons'
 import { useQuery } from '@tanstack/react-query'
 import { ActivityIndicator, Image, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import type { DriverTrip, StopPassengers } from '@/lib/api'
+import type { BoardingStop, DriverTrip, TripWithPassengers } from '@/lib/api'
 import { tripsApi } from '@/lib/api'
 import { Brand, Spacing } from '@/constants/theme'
 
@@ -12,21 +12,22 @@ export default function PassengersScreen() {
     queryFn: tripsApi.driverActive,
   })
 
-  const { data: stops = [], isLoading: stopsLoading, refetch, isFetching } = useQuery<StopPassengers[]>({
+  const { data: tripDetail, isLoading: stopsLoading, refetch, isFetching } = useQuery<TripWithPassengers>({
     queryKey: ['trip-passengers', trip?.id],
     queryFn: () => tripsApi.passengers(trip!.id),
     enabled: !!trip?.id,
   })
 
+  const stops: BoardingStop[] = tripDetail?.boarding_stops ?? []
   const totalPassengers = stops.reduce((n, s) => n + s.passengers.length, 0)
 
   const sections = stops.map((s) => ({
-    title: s.stop_name,
+    title: s.location_name,
     count: s.passengers.length,
     data: s.passengers,
   }))
 
-  if (tripLoading || stopsLoading) {
+  if (tripLoading || (!!trip?.id && stopsLoading)) {
     return (
       <SafeAreaView style={s.safe}>
         <ActivityIndicator color={Brand.green} style={{ marginTop: 80 }} />

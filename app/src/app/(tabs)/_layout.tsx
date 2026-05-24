@@ -43,7 +43,6 @@ export default function PassengerTabsLayout() {
           tabBarIcon: ({ color, size }) => <Feather name="user" size={size ?? 22} color={color} />,
         }}
       />
-      <Tabs.Screen name="trip/[id]" options={{ href: null }} />
     </Tabs>
   )
 }

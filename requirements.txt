@@ -10,3 +10,4 @@ python-jose==3.5.0
 python-multipart==0.0.20
 geoalchemy2==0.18.0
 stripe
+fpdf2==2.8.7

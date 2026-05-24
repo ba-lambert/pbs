@@ -48,14 +48,8 @@ export default function ChangePasswordScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={s.title}>Set your password</Text>
-            <Text style={s.subtitle}>Required before you can access your dashboard</Text>
+            <Text style={s.subtitle}>You're using a temporary password — set a personal one to continue</Text>
           </View>
-        </View>
-
-        {/* Timer warning */}
-        <View style={s.timerBadge}>
-          <Feather name="clock" size={14} color="#d97706" />
-          <Text style={s.timerText}>Your temporary password expires in 15 minutes</Text>
         </View>
 
         {error ? (
@@ -156,13 +150,6 @@ const s = StyleSheet.create({
   warningIcon: { width: 56, height: 56, borderRadius: 18, backgroundColor: Brand.greenLight, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 18, fontWeight: '800', color: Brand.navy },
   subtitle: { fontSize: 13, color: '#64748b', marginTop: 2, lineHeight: 18 },
-
-  timerBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#fffbeb', borderRadius: 12, padding: Spacing.two,
-    borderWidth: 1, borderColor: '#fef08a',
-  },
-  timerText: { fontSize: 13, color: '#d97706', fontWeight: '500', flex: 1 },
 
   errorBox: {
     flexDirection: 'row', alignItems: 'center', gap: 6,

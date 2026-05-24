@@ -1,7 +1,7 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { useCallback, useEffect, useState } from 'react'
-import { AuthContext, type AuthUser, clearAuth, loadStoredUser, saveAuth } from '@/lib/auth-store'
+import { AuthContext, type AuthUser, clearAuth, loadStoredUser, persistMustChangePasswordCleared, saveAuth } from '@/lib/auth-store'
 import { queryClient } from '@/lib/query-client'
 import type { AuthResponse } from '@/lib/api'
 
@@ -57,6 +57,7 @@ export default function RootLayout() {
 
   const clearMustChangePassword = useCallback(() => {
     setUser((prev) => (prev ? { ...prev, must_change_password: false } : prev))
+    void persistMustChangePasswordCleared()
   }, [])
 
   return (
@@ -66,6 +67,7 @@ export default function RootLayout() {
           <Stack.Screen name="index" />
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="(driver)" />
+          <Stack.Screen name="trip/[id]" />
           <Stack.Screen name="sign-in" options={{ presentation: 'modal' }} />
           <Stack.Screen name="sign-up" options={{ presentation: 'modal' }} />
           <Stack.Screen name="change-password" />

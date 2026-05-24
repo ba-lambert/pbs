@@ -23,7 +23,7 @@ def _get_stripe():
     return stripe
 
 
-@router.post("/intent", dependencies=[Depends(require_roles(Role.PASSENGER))])
+@router.post("/intent")
 def create_payment_intent(
     payload: PaymentIntentCreate,
     db: Session = Depends(get_db),
@@ -61,6 +61,17 @@ def create_payment_intent(
             "destination_id": payload.destination_id,
         },
     )
+
+    # In test mode auto-confirm with Stripe test card so mobile can skip SDK confirmation
+    if settings.stripe_secret_key.startswith("sk_test_"):
+        try:
+            intent = s.PaymentIntent.confirm(
+                intent.id,
+                payment_method="pm_card_visa",
+            )
+        except Exception:
+            pass  # ignore if already confirmed or card declined in test
+
     return {
         "client_secret": intent.client_secret,
         "payment_intent_id": intent.id,

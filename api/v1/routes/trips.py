@@ -14,6 +14,39 @@ from utils.route_distance import route_fractions_and_distance, segment_seats_tak
 
 router = APIRouter()
 
+_MAX_TRIP_HOURS = 12  # fallback duration when arrival_at is unknown
+
+
+def _check_driver_conflict(
+    db: Session,
+    driver_id: int,
+    departure_at: datetime,
+    arrival_at: datetime | None,
+    exclude_trip_id: int | None = None,
+) -> None:
+    new_end = arrival_at or (departure_at + timedelta(hours=_MAX_TRIP_HOURS))
+    query = (
+        select(Trip)
+        .where(Trip.driver_id == driver_id)
+        .where(Trip.status != "cancelled")
+        .where(Trip.departure_at < new_end)
+        .where(
+            (Trip.arrival_at > departure_at)
+            | (
+                (Trip.arrival_at.is_(None))
+                & (Trip.departure_at + timedelta(hours=_MAX_TRIP_HOURS) > departure_at)
+            )
+        )
+    )
+    if exclude_trip_id is not None:
+        query = query.where(Trip.id != exclude_trip_id)
+    conflict = db.scalars(query).first()
+    if conflict:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Driver already has a trip scheduled at that time (trip #{conflict.id})",
+        )
+
 
 def _trip_detail(trip: Trip, db: Session, include_passengers: bool = False) -> dict:
     bus = db.get(Bus, trip.bus_id)
@@ -126,6 +159,7 @@ def create_trip(payload: TripCreate, db: Session = Depends(get_db), current_user
     duration_minutes = payload.duration_minutes
     if duration_minutes is None and arrival_at is not None:
         duration_minutes = int((arrival_at - payload.departure_at).total_seconds() // 60)
+    _check_driver_conflict(db, payload.driver_id, payload.departure_at, arrival_at)
     item = Trip(
         company_id=payload.company_id,
         route_id=payload.route_id,
@@ -377,6 +411,7 @@ def update_trip(trip_id: int, payload: TripCreate, db: Session = Depends(get_db)
     duration_minutes = payload.duration_minutes
     if duration_minutes is None and arrival_at is not None:
         duration_minutes = int((arrival_at - payload.departure_at).total_seconds() // 60)
+    _check_driver_conflict(db, payload.driver_id, payload.departure_at, arrival_at, exclude_trip_id=trip_id)
     item.company_id = payload.company_id
     item.route_id = payload.route_id
     item.bus_id = payload.bus_id

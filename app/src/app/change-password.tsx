@@ -69,7 +69,7 @@ export default function ChangePasswordScreen() {
                 value={current}
                 onChangeText={setCurrent}
                 secureTextEntry={!showCurrent}
-                placeholder="PBS@XXXX"
+                placeholder="P@XXXX"
                 placeholderTextColor="#cbd5e1"
               />
               <Pressable onPress={() => setShowCurrent(!showCurrent)} style={s.eyeBtn}>

@@ -36,7 +36,7 @@ export function LoginPage() {
           </div>
 
           <div className="absolute bottom-10 left-16 xl:left-24">
-            <p className="text-xs font-medium text-zinc-500">© 2026 PBS Rwanda Transit. All rights reserved.</p>
+            <p className="text-xs font-medium text-zinc-500">© 2026 EBus Transit Rwanda Transit. All rights reserved.</p>
           </div>
         </div>
       </section>

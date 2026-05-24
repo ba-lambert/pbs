@@ -53,7 +53,7 @@ export default function SignInScreen() {
             <View style={s.brandIcon}>
               <Feather name="navigation" size={24} color={Brand.green} />
             </View>
-            <Text style={s.brandName}>PBS Rwanda</Text>
+            <Text style={s.brandName}>EBus Transit Rwanda</Text>
             <Text style={s.brandSub}>Public Bus Service</Text>
           </View>
 

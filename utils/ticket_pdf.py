@@ -42,7 +42,7 @@ def generate_ticket_pdf(
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Helvetica", "B", 22)
     pdf.set_xy(20, 10)
-    pdf.cell(0, 10, "PBS Rwanda", ln=True)
+    pdf.cell(0, 10, "EBus Transit Rwanda", ln=True)
     pdf.set_font("Helvetica", "", 11)
     pdf.set_x(20)
     pdf.cell(0, 6, "Public Bus Service - E-Ticket", ln=True)

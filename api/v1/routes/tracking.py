@@ -269,15 +269,16 @@ def fleet_positions(db: Session = Depends(get_db), current_user: User = Depends(
                     # GeoJSON coords are [lon, lat] — flip to [lat, lon] for Leaflet
                     route_coords = [[c[1], c[0]] for c in geom.get("coordinates", [])]
 
-                pos = interpolate_position(
-                    route.geometry,
-                    active_trip.departure_at,
-                    active_trip.arrival_at,
-                    active_trip.duration_minutes,
-                    now,
-                )
-                if pos:
-                    lat, lon, simulated = pos[0], pos[1], True
+                if row:
+                    pos = interpolate_position(
+                        row,
+                        active_trip.departure_at,
+                        active_trip.arrival_at,
+                        active_trip.duration_minutes,
+                        now,
+                    )
+                    if pos:
+                        lat, lon, simulated = pos[0], pos[1], True
 
         # Latest GPS ping — used for real position and speed
         latest = db.scalar(

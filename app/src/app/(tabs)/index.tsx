@@ -85,7 +85,7 @@ export default function PlannerScreen() {
         {/* Header */}
         <View style={s.header}>
           <View>
-            <Text style={s.headerTitle}>PBS Rwanda</Text>
+            <Text style={s.headerTitle}>EBus Transit Rwanda</Text>
             <Text style={s.headerSub}>Where are you headed?</Text>
           </View>
           <View style={s.headerIcon}>

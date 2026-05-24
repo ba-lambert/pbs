@@ -44,9 +44,9 @@ export function DashboardLayout() {
         <div className="flex min-h-full w-full flex-col">
           <div className="border-b border-[var(--color-border)] px-4 py-4">
             <div className="flex items-center gap-3">
-              <div className="grid size-9 place-items-center rounded-[var(--radius-sm)] bg-[var(--color-primary)] text-sm font-bold text-white">PB</div>
+              <div className="grid size-9 place-items-center rounded-[var(--radius-sm)] bg-[var(--color-primary)] text-sm font-bold text-white">EB</div>
               <div>
-                <p className="text-sm font-semibold text-white">PBS Operations</p>
+                <p className="text-sm font-semibold text-white">EBus Transit Rwanda</p>
                 <p className="mono text-[11px] text-slate-300">Rwanda Admin</p>
               </div>
             </div>

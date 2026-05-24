@@ -72,7 +72,7 @@ export default function TripDetailScreen() {
       intentId = res.payment_intent_id
 
       const { error: initErr } = await initPaymentSheet({
-        merchantDisplayName: 'PBS Rwanda',
+        merchantDisplayName: 'EBus Transit Rwanda',
         paymentIntentClientSecret: res.client_secret,
         defaultBillingDetails: { name: user?.full_name ?? name.trim() },
         appearance: { colors: { primary: '#16a34a' } },

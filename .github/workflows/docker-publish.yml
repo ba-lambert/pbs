@@ -157,13 +157,13 @@ jobs:
 
             cd ~/pbs
 
-            # ── Phase 1: pull new images while old containers are still serving ──
-            echo ">>> Pulling new images (old containers keep running)..."
+            # ── Phase 1: pull new images ──
+            echo ">>> Pulling new images..."
             podman-compose -f docker-compose.prod.yml pull
 
-            # ── Phase 2: rolling restart (podman recreates only changed services) ──
-            echo ">>> Restarting services..."
-            podman-compose -f docker-compose.prod.yml up -d --remove-orphans
+            # ── Phase 2: force-recreate all app containers so new images are used ──
+            echo ">>> Restarting containers with new images..."
+            podman-compose -f docker-compose.prod.yml up -d --remove-orphans --force-recreate
 
             # ── Phase 3: wait for health checks (max 2 min) ──
             echo ">>> Waiting for health checks..."

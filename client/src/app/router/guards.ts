@@ -1,5 +1,5 @@
 import { redirect } from '@tanstack/react-router'
-import { getToken } from '../../shared/lib/auth-storage'
+import { getToken, getRole } from '../../shared/lib/auth-storage'
 
 export function requireAuth() {
   if (!getToken()) {
@@ -7,8 +7,18 @@ export function requireAuth() {
   }
 }
 
+export function requireAdminRole() {
+  if (!getToken()) {
+    throw redirect({ to: '/login' })
+  }
+  if (getRole() === 'driver') {
+    throw redirect({ to: '/driver' })
+  }
+}
+
 export function redirectIfAuthenticated() {
-  if (getToken()) {
-    throw redirect({ to: '/dashboard' })
+  const token = getToken()
+  if (token) {
+    throw redirect({ to: getRole() === 'driver' ? '/driver' : '/dashboard' })
   }
 }

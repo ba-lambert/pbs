@@ -27,6 +27,7 @@ export interface BusItem {
 export interface DriverItem {
   id: number
   company_id: number
+  email?: string | null
   full_name: string
   gender?: string | null
   bus_id?: number | null

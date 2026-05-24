@@ -1,12 +1,13 @@
 import { createRootRoute, createRoute, createRouter, redirect } from '@tanstack/react-router'
 import { RootLayout } from '../layouts/root-layout'
 import { DashboardLayout } from '../layouts/dashboard-layout'
-import { getToken } from '../../shared/lib/auth-storage'
-import { requireAuth, redirectIfAuthenticated } from './guards'
+import { getToken, getRole } from '../../shared/lib/auth-storage'
+import { requireAuth, requireAdminRole, redirectIfAuthenticated } from './guards'
 import { LoginPage } from '../../features/auth/pages/login-page'
 import { GeographyPage } from '../../features/geography/pages/geography-page'
 import { CompaniesPage, FleetPage, UsersPage, PricingPage } from '../../features/operations'
 import { DashboardOverview, TripsPage } from '../routes/operations-pages'
+import { DriverDashboardPage } from '../../features/driver/pages/driver-dashboard-page'
 
 const rootRoute = createRootRoute({
   component: RootLayout,
@@ -16,7 +17,8 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   beforeLoad: () => {
-    throw redirect({ to: getToken() ? '/dashboard' : '/login' })
+    if (!getToken()) throw redirect({ to: '/login' })
+    throw redirect({ to: getRole() === 'driver' ? '/driver' : '/dashboard' })
   },
 })
 
@@ -30,8 +32,15 @@ const loginRoute = createRoute({
 const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/dashboard',
-  beforeLoad: requireAuth,
+  beforeLoad: requireAdminRole,
   component: DashboardLayout,
+})
+
+const driverRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/driver',
+  beforeLoad: requireAuth,
+  component: DriverDashboardPage,
 })
 
 const overviewRoute = createRoute({
@@ -49,6 +58,7 @@ const pricingRoute = createRoute({ getParentRoute: () => dashboardRoute, path: '
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
+  driverRoute,
   dashboardRoute.addChildren([overviewRoute, companiesRoute, usersRoute, geographyRoute, fleetRoute, tripsRoute, pricingRoute]),
 ])
 

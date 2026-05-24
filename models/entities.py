@@ -85,9 +85,10 @@ class Driver(Base):
     bus_id: Mapped[int | None] = mapped_column(ForeignKey("buses.id", ondelete="SET NULL"), nullable=True, index=True)
     full_name: Mapped[str] = mapped_column(String(200))
     gender: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True, index=True)
     license_number: Mapped[str] = mapped_column(String(80), unique=True, index=True)
     license_category: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    phone: Mapped[str] = mapped_column(String(32))
+    phone: Mapped[str] = mapped_column(String(32), unique=True, index=True)
     profile_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 

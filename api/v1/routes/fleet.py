@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import secrets
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -8,10 +10,13 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from api.core.database import get_db
+from api.core.email import send_driver_welcome
 from api.core.security import hash_password
 from api.deps import enforce_company_scope, get_current_user, require_roles
 from api.schemas import BusCreate, BusDistrictAssign, DriverCreate
 from models.entities import Bus, BusDistrict, Driver, Role, User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 UPLOAD_DIR = Path("uploads/drivers")
@@ -131,7 +136,16 @@ def assign_bus_districts(
     return {"bus_id": bus_id, "district_ids": payload.district_ids}
 
 
-@router.post("/drivers", dependencies=[Depends(require_roles(Role.SUPER_ADMIN, Role.COMPANY_ADMIN, Role.COMPANY_OPERATOR))])
+def _check_bus_driver_limit(db: Session, bus_id: int, exclude_driver_id: int | None = None) -> None:
+    query = select(Driver).where(Driver.bus_id == bus_id)
+    if exclude_driver_id:
+        query = query.where(Driver.id != exclude_driver_id)
+    count = len(db.scalars(query).all())
+    if count >= 3:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A bus can have at most 3 drivers assigned")
+
+
+@router.post("/drivers", dependencies=[Depends(require_roles(Role.SUPER_ADMIN, Role.COMPANY_OPERATOR))])
 async def create_driver(
     request: Request,
     company_id: int | None = Form(default=None),
@@ -162,6 +176,16 @@ async def create_driver(
         profile_image_url=profile_image_url,
     )
     enforce_company_scope(current_user, payload.company_id)
+
+    if db.scalar(select(Driver).where(Driver.phone == payload.phone)):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Phone number already registered to another driver")
+    if db.scalar(select(Driver).where(Driver.license_number == payload.license_number)):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="License number already registered to another driver")
+    if payload.email and db.scalar(select(Driver).where(Driver.email == payload.email)):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered to another driver")
+    if payload.bus_id:
+        _check_bus_driver_limit(db, payload.bus_id)
+
     image_url = payload.profile_image_url
     if profile_image:
         image_url = _save_driver_image(profile_image)
@@ -170,8 +194,9 @@ async def create_driver(
     default_password = None
     if payload.email:
         if db.scalar(select(User).where(User.email == payload.email)):
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
-        default_password = f"PBS@{secrets.randbelow(9000) + 1000}"
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered as a user account")
+        chars = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+        default_password = "".join(secrets.choice(chars) for _ in range(8))
         driver_user = User(
             email=payload.email,
             full_name=payload.full_name,
@@ -180,7 +205,7 @@ async def create_driver(
             company_id=payload.company_id,
             is_active=True,
             must_change_password=True,
-            password_expires_at=datetime.now(UTC) + timedelta(minutes=15),
+            password_expires_at=datetime.now(UTC) + timedelta(minutes=5),
         )
         db.add(driver_user)
         db.flush()
@@ -189,6 +214,7 @@ async def create_driver(
     item = Driver(
         company_id=payload.company_id,
         user_id=driver_user_id,
+        email=payload.email,
         full_name=payload.full_name,
         gender=payload.gender,
         bus_id=payload.bus_id,
@@ -202,7 +228,13 @@ async def create_driver(
     db.add(item)
     db.commit()
     db.refresh(item)
-    return {"id": item.id, "user_id": driver_user_id, "default_password": default_password}
+
+    if default_password and payload.email:
+        asyncio.create_task(
+            send_driver_welcome(payload.email, payload.full_name, default_password)
+        )
+
+    return {"id": item.id, "user_id": driver_user_id}
 
 
 @router.get("/drivers", dependencies=[Depends(get_current_user)])
@@ -215,6 +247,7 @@ def list_drivers(db: Session = Depends(get_db), current_user: User = Depends(get
         {
             "id": i.id,
             "company_id": i.company_id,
+            "email": i.email,
             "full_name": i.full_name,
             "gender": i.gender,
             "bus_id": i.bus_id,
@@ -228,7 +261,7 @@ def list_drivers(db: Session = Depends(get_db), current_user: User = Depends(get
     ]
 
 
-@router.put("/drivers/{driver_id}", dependencies=[Depends(require_roles(Role.SUPER_ADMIN, Role.COMPANY_ADMIN, Role.COMPANY_OPERATOR))])
+@router.put("/drivers/{driver_id}", dependencies=[Depends(require_roles(Role.SUPER_ADMIN, Role.COMPANY_OPERATOR))])
 async def update_driver(
     driver_id: int,
     request: Request,
@@ -263,7 +296,18 @@ async def update_driver(
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Driver not found")
     enforce_company_scope(current_user, item.company_id)
+
+    if payload.phone != item.phone and db.scalar(select(Driver).where(Driver.phone == payload.phone)):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Phone number already registered to another driver")
+    if payload.license_number != item.license_number and db.scalar(select(Driver).where(Driver.license_number == payload.license_number)):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="License number already registered to another driver")
+    if payload.email and payload.email != item.email and db.scalar(select(Driver).where(Driver.email == payload.email)):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered to another driver")
+    if payload.bus_id and payload.bus_id != item.bus_id:
+        _check_bus_driver_limit(db, payload.bus_id, exclude_driver_id=driver_id)
+
     item.company_id = payload.company_id
+    item.email = payload.email
     item.full_name = payload.full_name
     item.gender = payload.gender
     item.bus_id = payload.bus_id
@@ -278,7 +322,7 @@ async def update_driver(
     return {"status": "updated"}
 
 
-@router.delete("/drivers/{driver_id}", dependencies=[Depends(require_roles(Role.SUPER_ADMIN, Role.COMPANY_ADMIN, Role.COMPANY_OPERATOR))])
+@router.delete("/drivers/{driver_id}", dependencies=[Depends(require_roles(Role.SUPER_ADMIN, Role.COMPANY_OPERATOR))])
 def delete_driver(driver_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     item = db.get(Driver, driver_id)
     if not item:

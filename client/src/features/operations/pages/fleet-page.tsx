@@ -121,10 +121,14 @@ export function FleetPage() {
         phone: payload.phone,
         profile_image: payload.profile_image?.[0] ?? null,
       }
-      if (selectedDriverId) await updateDriver(selectedDriverId, driverPayload)
-      else await createDriver(driverPayload)
+      if (selectedDriverId) {
+        await updateDriver(selectedDriverId, driverPayload)
+        setNotice('Driver updated')
+      } else {
+        await createDriver(driverPayload)
+        setNotice(driverPayload.email ? 'Driver created — login credentials sent to their email' : 'Driver created')
+      }
       setDriverDrawerOpen(false)
-      setNotice(selectedDriverId ? 'Driver updated' : 'Driver created')
       await refresh()
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to save driver'))
@@ -234,8 +238,9 @@ export function FleetPage() {
             <Table>
               <TableHead>
                 <TableRow className="hover:bg-transparent">
+                  <TableHeader>Photo</TableHeader>
                   <TableHeader>Name</TableHeader>
-                  <TableHeader>Gender</TableHeader>
+                  <TableHeader>Email</TableHeader>
                   <TableHeader>Phone</TableHeader>
                   <TableHeader>License</TableHeader>
                   <TableHeader>Category</TableHeader>
@@ -247,8 +252,21 @@ export function FleetPage() {
               <tbody>
                 {scopedDrivers.map((item) => (
                   <TableRow key={item.id}>
+                    <TableCell>
+                      {item.profile_image_url ? (
+                        <img
+                          src={item.profile_image_url}
+                          alt={item.full_name}
+                          className="size-9 rounded-full object-cover border border-zinc-200"
+                        />
+                      ) : (
+                        <span className="flex size-9 items-center justify-center rounded-full bg-zinc-100 text-sm font-semibold text-zinc-500">
+                          {item.full_name.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell className="font-semibold text-zinc-900">{item.full_name}</TableCell>
-                    <TableCell className="capitalize">{item.gender ?? '—'}</TableCell>
+                    <TableCell className="text-zinc-500">{item.email ?? '—'}</TableCell>
                     <TableCell>{item.phone}</TableCell>
                     <TableCell>{item.license_number}</TableCell>
                     <TableCell>{item.license_category ?? 'D'}</TableCell>
@@ -272,7 +290,7 @@ export function FleetPage() {
                 ))}
                 {isLoading || loadingCompanies ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-zinc-500">Loading drivers...</TableCell>
+                    <TableCell colSpan={10} className="text-zinc-500">Loading drivers...</TableCell>
                   </TableRow>
                 ) : null}
               </tbody>

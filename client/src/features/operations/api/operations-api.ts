@@ -86,7 +86,7 @@ function toDriverFormData(payload: DriverPayload) {
   return formData
 }
 
-export async function createDriver(payload: DriverPayload) {
+export async function createDriver(payload: DriverPayload): Promise<void> {
   await apiClient.post('/fleet/drivers', toDriverFormData(payload))
 }
 

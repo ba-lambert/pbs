@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "9a6b6f0e-0299-4a01-b293-7d2a618d0245"
+      }
+    },
+    "android": {
+      "package": "com.balambert.pbs"
+    }
+  }
+}

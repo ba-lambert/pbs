@@ -12,6 +12,7 @@
       "bundleIdentifier": "com.anonymous.app"
     },
     "android": {
+      "package": "com.pbs.rw",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

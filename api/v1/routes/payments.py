@@ -62,7 +62,6 @@ def create_payment_intent(
     intent = s.PaymentIntent.create(
         amount=amount_cents,
         currency="rwf",
-        # Disable redirect-based payment methods so no return_url is needed
         automatic_payment_methods={"enabled": True, "allow_redirects": "never"},
         metadata={
             "trip_id": trip.id,
@@ -72,17 +71,6 @@ def create_payment_intent(
             "destination_id": payload.destination_id,
         },
     )
-
-    # In test mode auto-confirm with Stripe test card so mobile can skip SDK confirmation
-    if settings.stripe_secret_key.startswith("sk_test_"):
-        try:
-            intent = s.PaymentIntent.confirm(
-                intent.id,
-                payment_method="pm_card_visa",
-                return_url="https://pbs.rw/booking/complete",
-            )
-        except Exception:
-            pass  # ignore if already confirmed
 
     return {
         "client_secret": intent.client_secret,

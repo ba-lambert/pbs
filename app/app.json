@@ -35,7 +35,11 @@
             "imageWidth": 76
           }
         }
-      ]
+      ],
+      ["@stripe/stripe-react-native", {
+        "merchantIdentifier": "merchant.com.pbs.rw",
+        "enableGooglePay": false
+      }]
     ],
     "experiments": {
       "typedRoutes": true,

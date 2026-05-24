@@ -196,20 +196,25 @@ def create_booking(
     ) or 0
     seat_number = total_paid + 1
 
-    # Stripe payment verification
+    # Stripe payment verification — require a succeeded intent before confirming
     stripe_key = settings.stripe_secret_key or ""
-    if stripe_key.startswith("sk_test_"):
-        # Test mode — always mark paid so guest/passenger booking works without real payment
-        payment_status = "paid"
-    elif payload.payment_intent_id and stripe_key:
+    if stripe_key:
+        if not payload.payment_intent_id:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail="Payment required — please select your boarding and destination to pay first",
+            )
         import stripe as _stripe
         _stripe.api_key = stripe_key
         intent = _stripe.PaymentIntent.retrieve(payload.payment_intent_id)
-        if intent.status == "succeeded":
-            payment_status = "paid"
-        else:
-            raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Payment not completed")
+        if intent.status != "succeeded":
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail="Payment not completed — please retry payment",
+            )
+        payment_status = "paid"
     else:
+        # No Stripe configured (local dev without key)
         payment_status = "paid"
 
     passenger_name = current_user.full_name if current_user else (payload.guest_name or "Guest")

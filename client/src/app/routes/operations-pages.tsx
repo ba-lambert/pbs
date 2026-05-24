@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
-import { FiClock, FiEdit2, FiPlus, FiTrash2, FiUsers, FiX } from 'react-icons/fi'
+import { FiEdit2, FiPlus, FiTrash2, FiUsers, FiX } from 'react-icons/fi'
 import { apiClient } from '../../shared/api/client'
 import { Button, Card, Dialog, Drawer, Input, Select } from '../../shared/ui'
 import { useCompanyScope } from '../../features/operations/hooks/use-company-scope'

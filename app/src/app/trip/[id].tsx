@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons'
+import { useStripe } from '@stripe/stripe-react-native'
 import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'
@@ -7,7 +8,6 @@ import {
   Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import type { AvailableTrip } from '@/lib/api'
 import { bookingsApi, paymentsApi, tripsApi } from '@/lib/api'
 import { useAuth } from '@/lib/auth-store'
 import { Brand, Spacing } from '@/constants/theme'
@@ -22,13 +22,13 @@ export default function TripDetailScreen() {
   const router = useRouter()
   const { user } = useAuth()
 
+  const { initPaymentSheet, presentPaymentSheet } = useStripe()
+
   const [sheetOpen, setSheetOpen] = useState(false)
   const [name, setName] = useState(user?.full_name ?? '')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
-  const [fareInfo, setFareInfo] = useState<{ fare_rwf: number; distance_km: number; payment_intent_id: string } | null>(null)
-  const [loadingFare, setLoadingFare] = useState(false)
-  const [booking, setBooking] = useState(false)
+  const [paying, setPaying] = useState(false)
   const [booked, setBooked] = useState(false)
 
   const { data: trips = [], isLoading } = useQuery({
@@ -38,47 +38,72 @@ export default function TripDetailScreen() {
 
   const trip = trips.find((t) => String(t.id) === id)
 
-  const openSheet = async () => {
+  const hasLocations = !!(originType && originId && destType && destId)
+
+  const openSheet = () => {
     if (!trip) return
-    setSheetOpen(true)
-    if (fareInfo) return  // already loaded
-    setLoadingFare(true)
-    try {
-      // Use passenger's specific origin/dest if available, else use trip's first/last stop as proxy
-      const hasLocations = originType && originId && destType && destId
-      if (hasLocations) {
-        const res = await paymentsApi.createIntent({
-          trip_id: trip.id,
-          origin_type: originType!,
-          origin_id: Number(originId),
-          destination_type: destType!,
-          destination_id: Number(destId),
-        })
-        setFareInfo({ fare_rwf: res.fare_rwf, distance_km: res.distance_km, payment_intent_id: res.payment_intent_id })
-      } else {
-        // No location — show segment_fare from trip card if available, skip Stripe intent
-        const cardFare = (trip as AvailableTrip & { segment_fare_rwf?: number; segment_distance_km?: number }).segment_fare_rwf
-        if (cardFare) {
-          setFareInfo({ fare_rwf: cardFare, distance_km: 0, payment_intent_id: '' })
-        }
-      }
-    } catch {
-      // fare estimate unavailable — continue without it
-    } finally {
-      setLoadingFare(false)
+    if (!hasLocations) {
+      Alert.alert(
+        'Select your journey',
+        'Go back to the search screen and choose your boarding and alighting location to calculate the fare and pay.',
+        [{ text: 'OK', onPress: () => router.back() }],
+      )
+      return
     }
+    setSheetOpen(true)
   }
 
-  const handleBook = async () => {
+  const handlePay = async () => {
     if (!trip) return
     if (!user && !name.trim()) { Alert.alert('Name required', 'Please enter your name'); return }
     if (!user && !phone.trim()) { Alert.alert('Phone required', 'Please enter your phone number'); return }
-    setBooking(true)
+
+    setPaying(true)
+    let intentId: string
     try {
-      const payload: Parameters<typeof bookingsApi.create>[0] = { trip_id: trip.id }
+      const res = await paymentsApi.createIntent({
+        trip_id: trip.id,
+        origin_type: originType!,
+        origin_id: Number(originId),
+        destination_type: destType!,
+        destination_id: Number(destId),
+      })
+      intentId = res.payment_intent_id
+
+      const { error: initErr } = await initPaymentSheet({
+        merchantDisplayName: 'PBS Rwanda',
+        paymentIntentClientSecret: res.client_secret,
+        defaultBillingDetails: { name: user?.full_name ?? name.trim() },
+        appearance: { colors: { primary: '#16a34a' } },
+      })
+      if (initErr) {
+        Alert.alert('Payment error', initErr.message)
+        return
+      }
+    } catch (e) {
+      Alert.alert('Payment error', e instanceof Error ? e.message : 'Could not set up payment. Please try again.')
+      return
+    } finally {
+      setPaying(false)
+    }
+
+    const { error: presentErr } = await presentPaymentSheet()
+    if (presentErr) {
+      if (presentErr.code !== 'Canceled') {
+        Alert.alert('Payment failed', presentErr.message)
+      }
+      return
+    }
+
+    // Payment succeeded — confirm booking
+    setPaying(true)
+    try {
+      const payload: Parameters<typeof bookingsApi.create>[0] = {
+        trip_id: trip.id,
+        payment_intent_id: intentId,
+      }
       if (email.trim()) payload.passenger_email = email.trim()
       if (!user) { payload.guest_name = name.trim(); payload.guest_phone = phone.trim() }
-      if (fareInfo?.payment_intent_id) payload.payment_intent_id = fareInfo.payment_intent_id
       if (originType === 'stop' && originId)  payload.origin_stop_id = Number(originId)
       if (originType === 'park' && originId)  payload.origin_park_id = Number(originId)
       if (destType === 'stop' && destId)      payload.destination_stop_id = Number(destId)
@@ -91,7 +116,7 @@ export default function TripDetailScreen() {
     } catch (e) {
       Alert.alert('Booking failed', e instanceof Error ? e.message : 'Please try again')
     } finally {
-      setBooking(false)
+      setPaying(false)
     }
   }
 
@@ -186,19 +211,29 @@ export default function TripDetailScreen() {
                 <Feather name="check" size={24} color="#fff" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.successTitle}>Booking confirmed!</Text>
-                <Text style={s.successSub}>Your seat is reserved. Check My Bookings for details.</Text>
+                <Text style={s.successTitle}>Payment & booking confirmed!</Text>
+                <Text style={s.successSub}>Your seat is reserved. A ticket will be emailed if you provided your address.</Text>
               </View>
             </View>
           ) : (
-            <Pressable
-              style={[s.bookBtn, full && s.bookBtnDisabled]}
-              onPress={() => { if (!full) void openSheet() }}
-              disabled={full}
-            >
-              <Feather name={full ? 'x-circle' : 'check-circle'} size={20} color="#fff" />
-              <Text style={s.bookBtnText}>{full ? 'Fully booked' : 'Book this seat'}</Text>
-            </Pressable>
+            <>
+              {!hasLocations && !full ? (
+                <View style={s.noLocationNote}>
+                  <Feather name="info" size={14} color="#92400e" />
+                  <Text style={s.noLocationText}>
+                    Go back and select your boarding and destination to calculate the fare and pay.
+                  </Text>
+                </View>
+              ) : null}
+              <Pressable
+                style={[s.bookBtn, (full || !hasLocations) && s.bookBtnDisabled]}
+                onPress={() => { if (!full && hasLocations) void openSheet() }}
+                disabled={full || !hasLocations}
+              >
+                <Feather name={full ? 'x-circle' : 'credit-card'} size={20} color="#fff" />
+                <Text style={s.bookBtnText}>{full ? 'Fully booked' : 'Pay & book seat'}</Text>
+              </Pressable>
+            </>
           )}
         </View>
       </ScrollView>
@@ -243,23 +278,11 @@ export default function TripDetailScreen() {
                 </View>
               ) : null}
 
-              {/* Fare */}
-              {loadingFare ? (
-                <View style={bs.fareRow}>
-                  <ActivityIndicator size="small" color={Brand.green} />
-                  <Text style={bs.fareLoading}>Calculating fare…</Text>
-                </View>
-              ) : fareInfo ? (
+              {/* Fare note */}
+              {hasLocations ? (
                 <View style={bs.fareCard}>
-                  <View style={bs.fareItem}>
-                    <Text style={bs.fareLabel}>Distance</Text>
-                    <Text style={bs.fareValue}>{fareInfo.distance_km.toFixed(1)} km</Text>
-                  </View>
-                  <View style={bs.fareDivider} />
-                  <View style={bs.fareItem}>
-                    <Text style={bs.fareLabel}>Fare</Text>
-                    <Text style={[bs.fareValue, { color: Brand.green, fontSize: 20 }]}>{Math.round(fareInfo.fare_rwf).toLocaleString()} RWF</Text>
-                  </View>
+                  <Feather name="credit-card" size={18} color={Brand.green} />
+                  <Text style={bs.fareNote}>Fare calculated at payment. Tap below to open Stripe checkout.</Text>
                 </View>
               ) : null}
 
@@ -325,18 +348,16 @@ export default function TripDetailScreen() {
               </View>
 
               <Pressable
-                style={[bs.confirmBtn, booking && bs.confirmBtnDisabled]}
-                onPress={handleBook}
-                disabled={booking}
+                style={[bs.confirmBtn, paying && bs.confirmBtnDisabled]}
+                onPress={() => void handlePay()}
+                disabled={paying}
               >
-                {booking ? (
+                {paying ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <>
-                    <Feather name="check-circle" size={20} color="#fff" />
-                    <Text style={bs.confirmBtnText}>
-                      {fareInfo ? `Pay ${Math.round(fareInfo.fare_rwf).toLocaleString()} RWF` : 'Confirm & book'}
-                    </Text>
+                    <Feather name="credit-card" size={20} color="#fff" />
+                    <Text style={bs.confirmBtnText}>Pay with Stripe</Text>
                   </>
                 )}
               </Pressable>
@@ -397,6 +418,8 @@ const s = StyleSheet.create({
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
 
+  noLocationNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#fef3c7', borderRadius: 12, padding: Spacing.two },
+  noLocationText: { flex: 1, fontSize: 13, color: '#92400e', lineHeight: 18 },
   bookBtn: { flexDirection: 'row', height: 56, borderRadius: 16, backgroundColor: Brand.green, alignItems: 'center', justifyContent: 'center', gap: 10 },
   bookBtnDisabled: { backgroundColor: '#94a3b8' },
   bookBtnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
@@ -430,13 +453,8 @@ const bs = StyleSheet.create({
   input: { flex: 1, fontSize: 15, color: Brand.navy },
   hint: { fontSize: 12, color: '#94a3b8' },
 
-  fareRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#f8fafc', borderRadius: 12, padding: Spacing.two },
-  fareLoading: { fontSize: 13, color: '#64748b' },
-  fareCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: Brand.greenLight, borderRadius: 14, padding: Spacing.three },
-  fareItem: { flex: 1, alignItems: 'center' },
-  fareLabel: { fontSize: 11, fontWeight: '600', color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 },
-  fareValue: { fontSize: 16, fontWeight: '800', color: Brand.navy, marginTop: 2 },
-  fareDivider: { width: 1, height: 36, backgroundColor: '#d1fae5' },
+  fareCard: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Brand.greenLight, borderRadius: 14, padding: Spacing.three },
+  fareNote: { flex: 1, fontSize: 13, color: '#166534', lineHeight: 18 },
 
   signInHint: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#f0fdf4', borderRadius: 10, padding: Spacing.two },
   signInText: { fontSize: 13, color: '#64748b' },

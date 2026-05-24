@@ -1,6 +1,6 @@
 import asyncio
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -10,8 +10,9 @@ from api.core.email import send_email
 from api.deps import get_current_user, optional_current_user
 from api.schemas import BookingCreate
 from models.entities import Booking, Bus, BusPark, District, Driver, FareConfig, Role, Route, Stop, Trip, User
-from utils.fare import calculate_linear_fare
+from utils.fare import calculate_fare
 from utils.geo import haversine_km
+from utils.route_distance import route_fractions_and_distance, segment_seats_taken
 from utils.ticket_pdf import generate_ticket_pdf
 
 router = APIRouter()
@@ -133,6 +134,7 @@ async def _send_ticket_email(
 @router.post("")
 def create_booking(
     payload: BookingCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User | None = Depends(optional_current_user),
 ):
@@ -142,52 +144,72 @@ def create_booking(
 
     # Guest validation: must supply name + email if not logged in
     if not current_user:
-        if not payload.passenger_email:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email is required for guest bookings")
         if not payload.guest_name:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Name is required for guest bookings")
+        if not payload.guest_phone:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phone number is required for guest bookings")
 
     bus = db.get(Bus, trip.bus_id)
     if not bus:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bus not found for this trip")
 
-    paid_count = db.scalar(
+    fare_cfg = db.scalar(select(FareConfig).order_by(FareConfig.id.asc()))
+    base = fare_cfg.base_rwf_per_km if fare_cfg else 50.0
+
+    has_origin = any([payload.origin_stop_id, payload.origin_park_id])
+    has_dest = any([payload.destination_stop_id, payload.destination_park_id, payload.destination_district_id])
+
+    board_frac: float | None = None
+    alight_frac: float | None = None
+
+    if has_origin and has_dest:
+        origin_lat, origin_lon = _get_point_coords(db, payload.origin_stop_id, payload.origin_park_id, None)
+        dest_lat, dest_lon = _get_point_coords(
+            db, payload.destination_stop_id, payload.destination_park_id, payload.destination_district_id
+        )
+        board_frac, alight_frac, distance_km = route_fractions_and_distance(
+            db, trip.route_id, origin_lat, origin_lon, dest_lat, dest_lon
+        )
+        fare = calculate_fare(distance_km, base)
+    else:
+        distance_km = 0.0
+        fare = base * 5  # flat minimum when no location
+
+    # Seat check for passenger's specific segment (or total if no fractions)
+    if board_frac is not None and alight_frac is not None:
+        taken = segment_seats_taken(db, trip.id, board_frac, alight_frac)
+    else:
+        taken = db.scalar(
+            select(func.count(Booking.id))
+            .where(Booking.trip_id == payload.trip_id)
+            .where(Booking.payment_status == "paid")
+        ) or 0
+
+    if taken >= bus.capacity:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No seats available for your journey segment")
+
+    # Assign the next seat number (globally per trip, not per segment)
+    total_paid = db.scalar(
         select(func.count(Booking.id))
         .where(Booking.trip_id == payload.trip_id)
         .where(Booking.payment_status == "paid")
     ) or 0
-    if paid_count >= bus.capacity:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This bus is full — no seats available")
-    seat_number = paid_count + 1
-
-    # Location & fare — optional; skip geo if locations not provided
-    has_origin = any([payload.origin_stop_id, payload.origin_park_id])
-    has_dest = any([payload.destination_stop_id, payload.destination_park_id, payload.destination_district_id])
-    fare_cfg = db.scalar(select(FareConfig).order_by(FareConfig.id.asc()))
-    base = fare_cfg.base_rwf_per_km if fare_cfg else 50.0
-
-    if has_origin and has_dest:
-        origin_lat, origin_lon = _get_point_coords(db, payload.origin_stop_id, payload.origin_park_id, None)
-        destination_lat, destination_lon = _get_point_coords(
-            db, payload.destination_stop_id, payload.destination_park_id, payload.destination_district_id
-        )
-        distance_km = haversine_km(origin_lat, origin_lon, destination_lat, destination_lon)
-        fare = calculate_linear_fare(distance_km, base)
-    else:
-        distance_km = 0.0
-        fare = base * 5  # flat minimum fare when no route info
+    seat_number = total_paid + 1
 
     # Stripe payment verification
-    payment_status = "pending"
-    if payload.payment_intent_id and settings.stripe_secret_key:
+    stripe_key = settings.stripe_secret_key or ""
+    if stripe_key.startswith("sk_test_"):
+        # Test mode — always mark paid so guest/passenger booking works without real payment
+        payment_status = "paid"
+    elif payload.payment_intent_id and stripe_key:
         import stripe as _stripe
-        _stripe.api_key = settings.stripe_secret_key
+        _stripe.api_key = stripe_key
         intent = _stripe.PaymentIntent.retrieve(payload.payment_intent_id)
         if intent.status == "succeeded":
             payment_status = "paid"
         else:
             raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Payment not completed")
-    elif payload.payment_intent_id:
+    else:
         payment_status = "paid"
 
     passenger_name = current_user.full_name if current_user else (payload.guest_name or "Guest")
@@ -196,9 +218,12 @@ def create_booking(
     booking = Booking(
         passenger_id=current_user.id if current_user else None,
         guest_name=payload.guest_name if not current_user else None,
+        guest_phone=payload.guest_phone if not current_user else None,
         trip_id=payload.trip_id,
         passenger_email=passenger_email,
         seat_number=seat_number if payment_status == "paid" else None,
+        board_fraction=board_frac,
+        alight_fraction=alight_frac,
         origin_stop_id=payload.origin_stop_id,
         origin_park_id=payload.origin_park_id,
         destination_stop_id=payload.destination_stop_id,
@@ -218,23 +243,23 @@ def create_booking(
         route = db.get(Route, trip.route_id)
         origin_name = _resolve_location_name(db, payload.origin_stop_id, payload.origin_park_id, None)
         dest_name = _resolve_location_name(db, payload.destination_stop_id, payload.destination_park_id, payload.destination_district_id)
-        asyncio.create_task(
-            _send_ticket_email(
-                to=passenger_email,
-                passenger_name=passenger_name,
-                booking_id=booking.id,
-                seat_number=seat_number,
-                route_name=route.name if route else "Unknown route",
-                bus_plate=bus.plate_number,
-                departure_at=trip.departure_at,
-                origin_name=origin_name,
-                destination_name=dest_name,
-                fare_rwf=fare,
-                distance_km=distance_km,
-            )
+        background_tasks.add_task(
+            _send_ticket_email,
+            to=passenger_email,
+            passenger_name=passenger_name,
+            booking_id=booking.id,
+            seat_number=seat_number,
+            route_name=route.name if route else "Unknown route",
+            bus_plate=bus.plate_number,
+            departure_at=trip.departure_at,
+            origin_name=origin_name,
+            destination_name=dest_name,
+            fare_rwf=fare,
+            distance_km=distance_km,
         )
 
-    remaining_seats = max(0, bus.capacity - (paid_count + (1 if payment_status == "paid" else 0)))
+    new_taken = taken + (1 if payment_status == "paid" else 0)
+    remaining_seats = max(0, bus.capacity - new_taken)
     return {
         "id": booking.id,
         "distance_km": booking.distance_km,

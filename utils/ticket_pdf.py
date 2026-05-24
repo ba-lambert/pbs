@@ -1,7 +1,22 @@
-import io
 from datetime import datetime
 
 from fpdf import FPDF
+
+_UNICODE_MAP = {
+    "—": "-",  # em dash
+    "–": "-",  # en dash
+    "‘": "'",  # left single quote
+    "’": "'",  # right single quote
+    "“": '"',  # left double quote
+    "”": '"',  # right double quote
+    "…": "...",  # ellipsis
+}
+
+
+def _safe(text: str) -> str:
+    for ch, repl in _UNICODE_MAP.items():
+        text = text.replace(ch, repl)
+    return text.encode("latin-1", errors="replace").decode("latin-1")
 
 
 def generate_ticket_pdf(
@@ -30,7 +45,7 @@ def generate_ticket_pdf(
     pdf.cell(0, 10, "PBS Rwanda", ln=True)
     pdf.set_font("Helvetica", "", 11)
     pdf.set_x(20)
-    pdf.cell(0, 6, "Public Bus Service — E-Ticket", ln=True)
+    pdf.cell(0, 6, "Public Bus Service - E-Ticket", ln=True)
 
     pdf.set_text_color(30, 30, 30)
     pdf.set_y(50)
@@ -53,10 +68,10 @@ def generate_ticket_pdf(
         pdf.cell(60, 6, label.upper(), ln=False)
         pdf.set_font("Helvetica", "", 11)
         pdf.set_text_color(30, 30, 30)
-        pdf.cell(0, 6, value, ln=True)
+        pdf.cell(0, 6, _safe(value), ln=True)
 
     row("Passenger", passenger_name)
-    row("Email", passenger_email)
+    row("Email", passenger_email or "")
     pdf.ln(2)
     row("Route", route_name)
     row("Bus", bus_plate)

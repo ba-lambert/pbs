@@ -35,12 +35,22 @@ export default function PlannerScreen() {
   const { data: parks     = [] } = useQuery({ queryKey: ['parks'],     queryFn: geoApi.parks     })
 
   const { data: trips = [], isLoading: tripsLoading, refetch } = useQuery<AvailableTrip[]>({
-    queryKey: ['trips-available', candidateRouteIds],
+    queryKey: ['trips-available', candidateRouteIds, origin?.id, dest?.id],
     queryFn: async () => {
-      if (candidateRouteIds.length === 0) return tripsApi.available()
-      const results = await Promise.all(candidateRouteIds.map((id) => tripsApi.available(id)))
-      const seen = new Set<number>()
-      return results.flat().filter((t) => { if (seen.has(t.id)) return false; seen.add(t.id); return true })
+      if (origin && dest) {
+        return tripsApi.available({
+          origin_type: origin.type, origin_id: origin.id,
+          destination_type: dest.type, destination_id: dest.id,
+        })
+      }
+      if (candidateRouteIds.length > 0) {
+        const results = await Promise.all(
+          candidateRouteIds.map((id) => tripsApi.available({ route_id: id }))
+        )
+        const seen = new Set<number>()
+        return results.flat().filter((t) => { if (seen.has(t.id)) return false; seen.add(t.id); return true })
+      }
+      return tripsApi.available()
     },
   })
 
@@ -91,6 +101,7 @@ export default function PlannerScreen() {
             selected={origin}
             itemsForType={itemsForType}
             onSelect={setOrigin}
+            onClear={() => { setOrigin(null); setPlanResult(null); setCandidateRouteIds([]) }}
           />
           <View style={s.divider}>
             <View style={s.dividerLine} />
@@ -105,6 +116,7 @@ export default function PlannerScreen() {
             selected={dest}
             itemsForType={itemsForType}
             onSelect={setDest}
+            onClear={() => { setDest(null); setPlanResult(null); setCandidateRouteIds([]) }}
           />
 
           {planError ? (
@@ -170,8 +182,8 @@ export default function PlannerScreen() {
             renderItem={({ item }) => (
               <TripCard
                 trip={item}
-                estimatedFare={planResult?.estimated_fare_rwf}
-                distanceKm={planResult?.distance_km}
+                estimatedFare={item.segment_fare_rwf ?? planResult?.estimated_fare_rwf}
+                distanceKm={item.segment_distance_km ?? planResult?.distance_km}
                 onPress={() =>
                   router.push({
                     pathname: '/trip/[id]',
@@ -199,13 +211,14 @@ export default function PlannerScreen() {
 // ─── Location Picker ─────────────────────────────────────────────────────────
 
 function LocationPicker({
-  role, iconName, selected, itemsForType, onSelect,
+  role, iconName, selected, itemsForType, onSelect, onClear,
 }: {
   role: string
   iconName: React.ComponentProps<typeof Feather>['name']
   selected: Location
   itemsForType: (type: LocationType) => LocationItem[]
   onSelect: (loc: Location) => void
+  onClear: () => void
 }) {
   const [modalVisible, setModalVisible] = useState(false)
   const [activeType, setActiveType] = useState<LocationType>('district')
@@ -236,7 +249,7 @@ function LocationPicker({
           <Text style={s.locationLabel}>{role}</Text>
           {selected ? (
             <View style={s.selectedWrap}>
-              <Text style={s.locationValue}>{selected.name}</Text>
+              <Text style={s.locationValue} numberOfLines={1}>{selected.name}</Text>
               <View style={s.typePill}>
                 <Text style={s.typePillText}>{TYPE_OPTIONS.find(t => t.value === selected.type)?.label}</Text>
               </View>
@@ -245,7 +258,13 @@ function LocationPicker({
             <Text style={s.locationPlaceholder}>Select location</Text>
           )}
         </View>
-        <Feather name="chevron-right" size={16} color="#94a3b8" />
+        {selected ? (
+          <Pressable onPress={(e) => { e.stopPropagation?.(); onClear() }} hitSlop={10} style={{ padding: 4 }}>
+            <Feather name="x-circle" size={18} color="#94a3b8" />
+          </Pressable>
+        ) : (
+          <Feather name="chevron-right" size={16} color="#94a3b8" />
+        )}
       </TouchableOpacity>
 
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={close}>

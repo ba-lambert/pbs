@@ -142,6 +142,7 @@ class TripCreate(BaseModel):
     departure_at: datetime
     arrival_at: datetime | None = None
     duration_minutes: int | None = Field(default=None, gt=0)
+    park_ids: list[int] = []
 
 
 class BookingCreate(BaseModel):
@@ -154,6 +155,7 @@ class BookingCreate(BaseModel):
     payment_intent_id: str | None = None
     passenger_email: str | None = None
     guest_name: str | None = None
+    guest_phone: str | None = None
 
 
 class FareConfigUpdate(BaseModel):

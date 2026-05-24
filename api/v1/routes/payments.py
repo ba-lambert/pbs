@@ -10,8 +10,9 @@ from api.deps import require_roles
 from api.schemas import PaymentIntentCreate
 from api.v1.routes.planner import _resolve_location
 from models.entities import Booking, Bus, FareConfig, Role, Trip
-from utils.fare import calculate_linear_fare
+from utils.fare import calculate_fare
 from utils.geo import haversine_km
+from utils.route_distance import route_fractions_and_distance
 
 router = APIRouter()
 
@@ -44,15 +45,25 @@ def create_payment_intent(
 
     origin_lat, origin_lon = _resolve_location(db, payload.origin_type, payload.origin_id)
     dest_lat, dest_lon = _resolve_location(db, payload.destination_type, payload.destination_id)
-    distance_km = haversine_km(origin_lat, origin_lon, dest_lat, dest_lon)
     fare_cfg = db.scalar(select(FareConfig).order_by(FareConfig.id.asc()))
     base = fare_cfg.base_rwf_per_km if fare_cfg else 50.0
-    fare_rwf = calculate_linear_fare(distance_km, base)
+
+    # Use road distance along the trip's route; fall back to haversine
+    try:
+        _, _, distance_km = route_fractions_and_distance(
+            db, trip.route_id, origin_lat, origin_lon, dest_lat, dest_lon
+        )
+    except Exception:
+        distance_km = haversine_km(origin_lat, origin_lon, dest_lat, dest_lon)
+
+    fare_rwf = calculate_fare(distance_km, base)
 
     amount_cents = max(50, int(fare_rwf))
     intent = s.PaymentIntent.create(
         amount=amount_cents,
         currency="rwf",
+        # Disable redirect-based payment methods so no return_url is needed
+        automatic_payment_methods={"enabled": True, "allow_redirects": "never"},
         metadata={
             "trip_id": trip.id,
             "origin_type": payload.origin_type,
@@ -68,9 +79,10 @@ def create_payment_intent(
             intent = s.PaymentIntent.confirm(
                 intent.id,
                 payment_method="pm_card_visa",
+                return_url="https://pbs.rw/booking/complete",
             )
         except Exception:
-            pass  # ignore if already confirmed or card declined in test
+            pass  # ignore if already confirmed
 
     return {
         "client_secret": intent.client_secret,

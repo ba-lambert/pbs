@@ -7,6 +7,7 @@ import {
   Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import type { AvailableTrip } from '@/lib/api'
 import { bookingsApi, paymentsApi, tripsApi } from '@/lib/api'
 import { useAuth } from '@/lib/auth-store'
 import { Brand, Spacing } from '@/constants/theme'
@@ -23,6 +24,7 @@ export default function TripDetailScreen() {
 
   const [sheetOpen, setSheetOpen] = useState(false)
   const [name, setName] = useState(user?.full_name ?? '')
+  const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [fareInfo, setFareInfo] = useState<{ fare_rwf: number; distance_km: number; payment_intent_id: string } | null>(null)
   const [loadingFare, setLoadingFare] = useState(false)
@@ -39,34 +41,43 @@ export default function TripDetailScreen() {
   const openSheet = async () => {
     if (!trip) return
     setSheetOpen(true)
-    // Fetch fare estimate via Stripe intent if we have origin+dest
-    if (originType && originId && destType && destId) {
-      setLoadingFare(true)
-      try {
+    if (fareInfo) return  // already loaded
+    setLoadingFare(true)
+    try {
+      // Use passenger's specific origin/dest if available, else use trip's first/last stop as proxy
+      const hasLocations = originType && originId && destType && destId
+      if (hasLocations) {
         const res = await paymentsApi.createIntent({
           trip_id: trip.id,
-          origin_type: originType,
+          origin_type: originType!,
           origin_id: Number(originId),
-          destination_type: destType,
+          destination_type: destType!,
           destination_id: Number(destId),
         })
-        setFareInfo({ fare_rwf: res.data.fare_rwf, distance_km: res.data.distance_km, payment_intent_id: res.data.payment_intent_id })
-      } catch {
-        // proceed without fare estimate — will be calculated at booking time
-      } finally {
-        setLoadingFare(false)
+        setFareInfo({ fare_rwf: res.fare_rwf, distance_km: res.distance_km, payment_intent_id: res.payment_intent_id })
+      } else {
+        // No location — show segment_fare from trip card if available, skip Stripe intent
+        const cardFare = (trip as AvailableTrip & { segment_fare_rwf?: number; segment_distance_km?: number }).segment_fare_rwf
+        if (cardFare) {
+          setFareInfo({ fare_rwf: cardFare, distance_km: 0, payment_intent_id: '' })
+        }
       }
+    } catch {
+      // fare estimate unavailable — continue without it
+    } finally {
+      setLoadingFare(false)
     }
   }
 
   const handleBook = async () => {
     if (!trip) return
-    if (!name.trim()) { Alert.alert('Name required', 'Please enter your name'); return }
+    if (!user && !name.trim()) { Alert.alert('Name required', 'Please enter your name'); return }
+    if (!user && !phone.trim()) { Alert.alert('Phone required', 'Please enter your phone number'); return }
     setBooking(true)
     try {
       const payload: Parameters<typeof bookingsApi.create>[0] = { trip_id: trip.id }
       if (email.trim()) payload.passenger_email = email.trim()
-      if (!user) payload.guest_name = name.trim()
+      if (!user) { payload.guest_name = name.trim(); payload.guest_phone = phone.trim() }
       if (fareInfo?.payment_intent_id) payload.payment_intent_id = fareInfo.payment_intent_id
       if (originType === 'stop' && originId)  payload.origin_stop_id = Number(originId)
       if (originType === 'park' && originId)  payload.origin_park_id = Number(originId)
@@ -260,22 +271,38 @@ export default function TripDetailScreen() {
                 </Pressable>
               ) : null}
 
-              {/* Name (guests only) */}
+              {/* Name + Phone (guests only) */}
               {!user ? (
-                <View style={bs.field}>
-                  <Text style={bs.label}>Your name <Text style={bs.required}>*</Text></Text>
-                  <View style={bs.inputWrap}>
-                    <Feather name="user" size={16} color="#94a3b8" />
-                    <TextInput
-                      style={bs.input}
-                      value={name}
-                      onChangeText={setName}
-                      placeholder="Full name"
-                      placeholderTextColor="#cbd5e1"
-                      autoCapitalize="words"
-                    />
+                <>
+                  <View style={bs.field}>
+                    <Text style={bs.label}>Full name <Text style={bs.required}>*</Text></Text>
+                    <View style={bs.inputWrap}>
+                      <Feather name="user" size={16} color="#94a3b8" />
+                      <TextInput
+                        style={bs.input}
+                        value={name}
+                        onChangeText={setName}
+                        placeholder="Your full name"
+                        placeholderTextColor="#cbd5e1"
+                        autoCapitalize="words"
+                      />
+                    </View>
                   </View>
-                </View>
+                  <View style={bs.field}>
+                    <Text style={bs.label}>Phone number <Text style={bs.required}>*</Text></Text>
+                    <View style={bs.inputWrap}>
+                      <Feather name="phone" size={16} color="#94a3b8" />
+                      <TextInput
+                        style={bs.input}
+                        value={phone}
+                        onChangeText={setPhone}
+                        placeholder="+250 7XX XXX XXX"
+                        placeholderTextColor="#cbd5e1"
+                        keyboardType="phone-pad"
+                      />
+                    </View>
+                  </View>
+                </>
               ) : null}
 
               {/* Email */}

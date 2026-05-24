@@ -169,6 +169,7 @@ class Booking(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     passenger_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     guest_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    guest_phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
     trip_id: Mapped[int] = mapped_column(ForeignKey("trips.id", ondelete="CASCADE"), index=True)
     origin_stop_id: Mapped[int | None] = mapped_column(ForeignKey("stops.id", ondelete="SET NULL"), nullable=True)
     origin_park_id: Mapped[int | None] = mapped_column(ForeignKey("bus_parks.id", ondelete="SET NULL"), nullable=True)
@@ -177,12 +178,22 @@ class Booking(Base):
     destination_district_id: Mapped[int | None] = mapped_column(ForeignKey("districts.id", ondelete="SET NULL"), nullable=True)
     passenger_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     seat_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    board_fraction: Mapped[float | None] = mapped_column(Float, nullable=True)
+    alight_fraction: Mapped[float | None] = mapped_column(Float, nullable=True)
     distance_km: Mapped[float] = mapped_column(Float)
     fare_rwf: Mapped[float] = mapped_column(Float)
     status: Mapped[str] = mapped_column(String(40), default="booked")
     payment_intent_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     payment_status: Mapped[str] = mapped_column(String(40), default="pending")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class TripPark(Base):
+    __tablename__ = "trip_parks"
+    __table_args__ = (UniqueConstraint("trip_id", "park_id", name="uq_trip_park"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    trip_id: Mapped[int] = mapped_column(ForeignKey("trips.id", ondelete="CASCADE"), index=True)
+    park_id: Mapped[int] = mapped_column(ForeignKey("bus_parks.id", ondelete="CASCADE"), index=True)
 
 
 class BusLocation(Base):

@@ -16,6 +16,7 @@ from models.entities import (
     RouteStop,
     Stop,
     Trip,
+    TripPark,
     User,
 )
 

@@ -1,14 +1,16 @@
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import delete as sa_delete, func, select
 from sqlalchemy.orm import Session
 
 from api.core.database import get_db
 from api.deps import enforce_company_scope, get_current_user, require_roles
 from api.schemas import TripCreate
-from models.entities import Booking, Bus, BusPark, District, Driver, Role, Route, Stop, Trip, User
+from models.entities import Booking, Bus, BusPark, District, Driver, FareConfig, Role, Route, RoutePark, Stop, Trip, TripPark, User
 from utils.bus_simulator import estimate_eta_minutes, interpolate_position
+from utils.fare import calculate_fare
+from utils.route_distance import route_fractions_and_distance, segment_seats_taken
 
 router = APIRouter()
 
@@ -80,6 +82,25 @@ def _trip_detail(trip: Trip, db: Session, include_passengers: bool = False) -> d
     return data
 
 
+@router.get("/route-parks/{route_id}", dependencies=[Depends(require_roles(Role.COMPANY_OPERATOR, Role.COMPANY_ADMIN, Role.SUPER_ADMIN))])
+def route_parks(route_id: int, db: Session = Depends(get_db)):
+    """Return all bus parks assigned to a route, ordered by index."""
+    rows = db.execute(
+        select(BusPark, RoutePark.order_index)
+        .join(RoutePark, RoutePark.park_id == BusPark.id)
+        .where(RoutePark.route_id == route_id)
+        .order_by(RoutePark.order_index)
+    ).all()
+    return [{"id": park.id, "name": park.name, "order_index": idx} for park, idx in rows]
+
+
+@router.get("/{trip_id}/parks", dependencies=[Depends(require_roles(Role.COMPANY_OPERATOR, Role.COMPANY_ADMIN, Role.SUPER_ADMIN))])
+def trip_parks_list(trip_id: int, db: Session = Depends(get_db)):
+    """Return park IDs that this trip stops at."""
+    rows = db.scalars(select(TripPark.park_id).where(TripPark.trip_id == trip_id)).all()
+    return list(rows)
+
+
 @router.post("", dependencies=[Depends(require_roles(Role.COMPANY_OPERATOR))])
 def create_trip(payload: TripCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     enforce_company_scope(current_user, payload.company_id)
@@ -109,13 +130,48 @@ def create_trip(payload: TripCreate, db: Session = Depends(get_db), current_user
         status="scheduled",
     )
     db.add(item)
+    db.flush()
+    for park_id in payload.park_ids:
+        db.add(TripPark(trip_id=item.id, park_id=park_id))
     db.commit()
     db.refresh(item)
     return {"id": item.id}
 
 
+def _resolve_latlon(db: Session, loc_type: str | None, loc_id: int | None) -> tuple[float, float] | None:
+    if not loc_type or not loc_id:
+        return None
+    if loc_type == "stop":
+        row = db.execute(
+            select(func.ST_Y(func.ST_Centroid(Stop.geometry)), func.ST_X(func.ST_Centroid(Stop.geometry))).where(Stop.id == loc_id)
+        ).first()
+    elif loc_type == "park":
+        row = db.execute(
+            select(func.ST_Y(func.ST_Centroid(BusPark.geometry)), func.ST_X(func.ST_Centroid(BusPark.geometry))).where(BusPark.id == loc_id)
+        ).first()
+    elif loc_type == "district":
+        row = db.execute(
+            select(func.ST_Y(func.ST_Centroid(BusPark.geometry)), func.ST_X(func.ST_Centroid(BusPark.geometry)))
+            .join(District, District.id == BusPark.district_id)
+            .where(District.id == loc_id)
+            .limit(1)
+        ).first()
+    else:
+        return None
+    if not row:
+        return None
+    return float(row[0]), float(row[1])
+
+
 @router.get("/available")
-def list_available_trips(route_id: int | None = None, db: Session = Depends(get_db)):
+def list_available_trips(
+    route_id: int | None = None,
+    origin_type: str | None = None,
+    origin_id: int | None = None,
+    destination_type: str | None = None,
+    destination_id: int | None = None,
+    db: Session = Depends(get_db),
+):
     now = datetime.now(UTC)
     query = (
         select(Trip, Bus, Route)
@@ -127,13 +183,53 @@ def list_available_trips(route_id: int | None = None, db: Session = Depends(get_
     if route_id:
         query = query.where(Trip.route_id == route_id)
     rows = db.execute(query.order_by(Trip.departure_at.asc())).all()
+
+    origin_ll  = _resolve_latlon(db, origin_type, origin_id)
+    dest_ll    = _resolve_latlon(db, destination_type, destination_id)
+    fare_cfg   = db.scalar(select(FareConfig).order_by(FareConfig.id.asc()))
+    base_rate  = fare_cfg.base_rwf_per_km if fare_cfg else 50.0
+    has_search = origin_ll is not None and dest_ll is not None
+
     result = []
     for trip, bus, route in rows:
-        booked = db.scalar(
-            select(func.count(Booking.id))
-            .where(Booking.trip_id == trip.id)
-            .where(Booking.payment_status == "paid")
-        ) or 0
+        board_frac: float | None = None
+        alight_frac: float | None = None
+        distance_km: float | None = None
+        fare_rwf: float | None = None
+
+        if has_search:
+            try:
+                bf, af, dist = route_fractions_and_distance(
+                    db, route.id,
+                    origin_ll[0], origin_ll[1],
+                    dest_ll[0], dest_ll[1],
+                )
+                # If fractions are nearly identical, origin/dest map to same route point — skip
+                if abs(af - bf) < 0.005:
+                    continue
+                # Normalise so board < alight regardless of linestring storage direction
+                board_frac  = min(bf, af)
+                alight_frac = max(bf, af)
+                distance_km = dist
+                fare_rwf    = calculate_fare(dist, base_rate)
+                taken = segment_seats_taken(db, trip.id, board_frac, alight_frac)
+                available = max(0, bus.capacity - taken)
+            except Exception:
+                # Route geometry missing — fall back to total booked count
+                taken = db.scalar(
+                    select(func.count(Booking.id))
+                    .where(Booking.trip_id == trip.id)
+                    .where(Booking.payment_status == "paid")
+                ) or 0
+                available = max(0, bus.capacity - taken)
+        else:
+            taken = db.scalar(
+                select(func.count(Booking.id))
+                .where(Booking.trip_id == trip.id)
+                .where(Booking.payment_status == "paid")
+            ) or 0
+            available = max(0, bus.capacity - taken)
+
         result.append({
             "id": trip.id,
             "route_id": trip.route_id,
@@ -147,7 +243,9 @@ def list_available_trips(route_id: int | None = None, db: Session = Depends(get_
             "arrival_at": trip.arrival_at,
             "duration_minutes": trip.duration_minutes,
             "status": trip.status,
-            "available_seats": max(0, bus.capacity - booked),
+            "available_seats": available,
+            "segment_distance_km": round(distance_km, 2) if distance_km is not None else None,
+            "segment_fare_rwf": round(fare_rwf, 2) if fare_rwf is not None else None,
         })
     return result
 
@@ -279,6 +377,9 @@ def update_trip(trip_id: int, payload: TripCreate, db: Session = Depends(get_db)
     item.departure_at = payload.departure_at
     item.arrival_at = arrival_at
     item.duration_minutes = duration_minutes
+    db.execute(sa_delete(TripPark).where(TripPark.trip_id == trip_id))
+    for park_id in payload.park_ids:
+        db.add(TripPark(trip_id=trip_id, park_id=park_id))
     db.commit()
     return {"status": "updated"}
 

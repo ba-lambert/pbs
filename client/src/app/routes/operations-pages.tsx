@@ -14,7 +14,10 @@ type TripForm = {
   departure_at: string
   arrival_at: string
   duration_minutes: number
+  park_ids: number[]
 }
+
+type RouteParkItem = { id: number; name: string; order_index: number }
 
 type TripItem = {
   id: number
@@ -131,11 +134,14 @@ export function TripsPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [routeParks, setRouteParks] = useState<RouteParkItem[]>([])
+  const [selectedParkIds, setSelectedParkIds] = useState<number[]>([])
 
   const form = useForm<TripForm>({
-    defaultValues: { company_id: 0, route_id: 0, bus_id: 0, driver_id: 0, departure_at: '', arrival_at: '', duration_minutes: 0 },
+    defaultValues: { company_id: 0, route_id: 0, bus_id: 0, driver_id: 0, departure_at: '', arrival_at: '', duration_minutes: 0, park_ids: [] },
   })
   const selectedBusId = useWatch({ control: form.control, name: 'bus_id' })
+  const selectedRouteId = useWatch({ control: form.control, name: 'route_id' })
   const busDrivers = useMemo(
     () => allDrivers.filter((d) => d.bus_id === Number(selectedBusId)),
     [allDrivers, selectedBusId],
@@ -156,6 +162,14 @@ export function TripsPage() {
 
   useEffect(() => { void refresh() }, [])
   useEffect(() => { if (selectedCompanyId) form.setValue('company_id', selectedCompanyId) }, [selectedCompanyId, form])
+  useEffect(() => {
+    const id = Number(selectedRouteId)
+    if (!id) { setRouteParks([]); setSelectedParkIds([]); return }
+    void apiClient.get<RouteParkItem[]>(`/trips/route-parks/${id}`).then((r) => {
+      setRouteParks(r.data)
+      setSelectedParkIds(r.data.map((p) => p.id))
+    }).catch(() => { setRouteParks([]); setSelectedParkIds([]) })
+  }, [selectedRouteId])
 
   const scopedTrips = useMemo(
     () => (selectedCompanyId ? trips.filter((t) => t.company_id === selectedCompanyId) : trips),
@@ -182,7 +196,7 @@ export function TripsPage() {
     [scopedBuses, scopedTrips],
   )
 
-  const openEditFromDialog = (trip: TripItem) => {
+  const openEditFromDialog = async (trip: TripItem) => {
     setDialogTrip(null)
     setEditingId(trip.id)
     form.reset({
@@ -193,7 +207,20 @@ export function TripsPage() {
       departure_at: new Date(trip.departure_at).toISOString().slice(0, 16),
       arrival_at: trip.arrival_at ? new Date(trip.arrival_at).toISOString().slice(0, 16) : '',
       duration_minutes: trip.duration_minutes ?? 0,
+      park_ids: [],
     })
+    // Load saved park selections for this trip
+    try {
+      const [parksRes, tripParksRes] = await Promise.all([
+        apiClient.get<RouteParkItem[]>(`/trips/route-parks/${trip.route_id}`),
+        apiClient.get<number[]>(`/trips/${trip.id}/parks`),
+      ])
+      setRouteParks(parksRes.data)
+      setSelectedParkIds(tripParksRes.data)
+    } catch {
+      setRouteParks([])
+      setSelectedParkIds([])
+    }
     setDrawerOpen(true)
   }
 
@@ -212,11 +239,14 @@ export function TripsPage() {
   const upsertTrip = form.handleSubmit(async (payload) => {
     setError(null)
     try {
-      if (editingId) await apiClient.put(`/trips/${editingId}`, payload)
-      else await apiClient.post('/trips', payload)
+      const body = { ...payload, park_ids: selectedParkIds }
+      if (editingId) await apiClient.put(`/trips/${editingId}`, body)
+      else await apiClient.post('/trips', body)
       setDrawerOpen(false)
       setEditingId(null)
-      form.reset({ company_id: selectedCompanyId ?? 0, route_id: 0, bus_id: 0, driver_id: 0, departure_at: '', arrival_at: '', duration_minutes: 0 })
+      setRouteParks([])
+      setSelectedParkIds([])
+      form.reset({ company_id: selectedCompanyId ?? 0, route_id: 0, bus_id: 0, driver_id: 0, departure_at: '', arrival_at: '', duration_minutes: 0, park_ids: [] })
       await refresh()
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
@@ -470,9 +500,37 @@ export function TripsPage() {
               <label className="grid gap-1 text-sm"><span>Departure</span><Input type="datetime-local" {...form.register('departure_at')} /></label>
               <label className="grid gap-1 text-sm"><span>Arrival</span><Input type="datetime-local" {...form.register('arrival_at')} /></label>
               <label className="grid gap-1 text-sm"><span>Duration (minutes)</span><Input type="number" min={1} {...form.register('duration_minutes', { valueAsNumber: true })} /></label>
+
+              {/* Bus park stops */}
+              {routeParks.length > 0 ? (
+                <div className="grid gap-2 text-sm">
+                  <span className="font-medium">Bus parks this trip stops at</span>
+                  <p className="text-xs text-zinc-400">Tick parks the bus will actually stop at on this trip.</p>
+                  <div className="space-y-1.5 rounded-lg border border-zinc-200 p-3">
+                    {routeParks.map((park) => {
+                      const checked = selectedParkIds.includes(park.id)
+                      return (
+                        <label key={park.id} className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-zinc-50">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() =>
+                              setSelectedParkIds((prev) =>
+                                checked ? prev.filter((id) => id !== park.id) : [...prev, park.id]
+                              )
+                            }
+                            className="size-4 rounded accent-emerald-600"
+                          />
+                          <span className="text-zinc-800">{park.name}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+              ) : null}
             </div>
             <div className="mt-auto flex justify-end gap-2 border-t border-zinc-200 px-6 py-4">
-              <Button type="button" className="bg-zinc-100 text-zinc-900 hover:bg-zinc-200" onClick={() => setDrawerOpen(false)}>Cancel</Button>
+              <Button type="button" className="bg-zinc-100 text-zinc-900 hover:bg-zinc-200" onClick={() => { setDrawerOpen(false); setRouteParks([]); setSelectedParkIds([]) }}>Cancel</Button>
               <Button type="submit">{editingId ? 'Update trip' : 'Create trip'}</Button>
             </div>
           </form>

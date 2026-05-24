@@ -91,6 +91,8 @@ export type AvailableTrip = {
   duration_minutes: number | null
   status: string
   available_seats: number
+  segment_distance_km: number | null
+  segment_fare_rwf: number | null
 }
 
 export type DriverTrip = {
@@ -130,8 +132,20 @@ export type BoardingStop = {
 export type TripWithPassengers = DriverTrip & { boarding_stops: BoardingStop[] }
 
 export const tripsApi = {
-  available: (route_id?: number) =>
-    api.get<AvailableTrip[]>(`/trips/available${route_id ? `?route_id=${route_id}` : ''}`),
+  available: (params?: {
+    route_id?: number
+    origin_type?: string; origin_id?: number
+    destination_type?: string; destination_id?: number
+  }): Promise<AvailableTrip[]> => {
+    const q = new URLSearchParams()
+    if (params?.route_id)          q.set('route_id',          String(params.route_id))
+    if (params?.origin_type)       q.set('origin_type',       params.origin_type)
+    if (params?.origin_id)         q.set('origin_id',         String(params.origin_id))
+    if (params?.destination_type)  q.set('destination_type',  params.destination_type)
+    if (params?.destination_id)    q.set('destination_id',    String(params.destination_id))
+    const qs = q.toString()
+    return api.get<AvailableTrip[]>(`/trips/available${qs ? `?${qs}` : ''}`)
+  },
   driverActive: () => api.get<DriverTrip | null>('/trips/driver/active'),
   driverMyTrips: () => api.get<DriverTrip[]>('/trips/driver/my-trips'),
   passengers: (trip_id: number) => api.get<TripWithPassengers>(`/trips/${trip_id}/passengers`),
@@ -153,6 +167,7 @@ export const bookingsApi = {
     trip_id: number
     passenger_email?: string
     guest_name?: string
+    guest_phone?: string
     origin_stop_id?: number
     origin_park_id?: number
     destination_stop_id?: number

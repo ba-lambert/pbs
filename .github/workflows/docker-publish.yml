@@ -114,7 +114,7 @@ jobs:
           source: docker-compose.prod.yml
           target: ~/pbs
 
-      - name: Deploy on VPS
+      - name: Deploy on VPS (zero-downtime)
         uses: appleboy/ssh-action@v1.2.0
         env:
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
@@ -155,9 +155,58 @@ jobs:
             # Log in to GHCR using the workflow's GITHUB_TOKEN (valid for this run)
             echo "${GHCR_TOKEN}" | podman login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
 
-            # Pull latest images and restart
             cd ~/pbs
+
+            # ── Phase 1: pull new images while old containers are still serving ──
+            echo ">>> Pulling new images (old containers keep running)..."
             podman-compose -f docker-compose.prod.yml pull
+
+            # ── Phase 2: rolling restart (podman recreates only changed services) ──
+            echo ">>> Restarting services..."
             podman-compose -f docker-compose.prod.yml up -d --remove-orphans
 
-            echo "Deploy complete."
+            # ── Phase 3: wait for health checks (max 2 min) ──
+            echo ">>> Waiting for health checks..."
+            MAX_WAIT=120
+            ELAPSED=0
+            while [ $ELAPSED -lt $MAX_WAIT ]; do
+              ALL_HEALTHY=true
+              for c in pbs_api pbs_client; do
+                STATUS=$(podman inspect "$c" --format "{{.State.Health.Status}}" 2>/dev/null || echo "missing")
+                if [ "$STATUS" != "healthy" ]; then
+                  ALL_HEALTHY=false
+                  echo "  $c → $STATUS"
+                fi
+              done
+              if $ALL_HEALTHY; then
+                echo "  All services healthy after ${ELAPSED}s"
+                break
+              fi
+              sleep 5
+              ELAPSED=$((ELAPSED + 5))
+              if [ $ELAPSED -ge $MAX_WAIT ]; then
+                echo "ERROR: health check timed out after ${MAX_WAIT}s"
+                podman logs --tail 30 pbs_api   2>/dev/null || true
+                podman logs --tail 30 pbs_client 2>/dev/null || true
+                exit 1
+              fi
+            done
+
+            echo ">>> Deploy complete."
+
+      - name: Health report
+        if: always()
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            echo "=== Container status ==="
+            podman ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            echo ""
+            echo "=== Health details ==="
+            for c in pbs_postgres pbs_api pbs_client; do
+              STATUS=$(podman inspect "$c" --format "{{.State.Health.Status}}" 2>/dev/null || echo "no healthcheck")
+              echo "  $c → $STATUS"
+            done

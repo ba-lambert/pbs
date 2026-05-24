@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "app",
+    "name": "eBus Rwanda",
     "slug": "app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -19,7 +19,12 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "statusBar": {
+        "backgroundColor": "#0f172a",
+        "translucent": false,
+        "style": "light"
+      }
     },
     "web": {
       "output": "static",
@@ -37,14 +42,24 @@
           }
         }
       ],
-      ["@stripe/stripe-react-native", {
-        "merchantIdentifier": "merchant.com.pbs.rw",
-        "enableGooglePay": false
-      }]
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.pbs.rw",
+          "enableGooglePay": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "3e53c430-f1c0-42c7-a7c2-cd21cf7711a9"
+      }
+    },
+    "owner": "balambert"
   }
 }

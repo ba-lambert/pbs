@@ -3,7 +3,7 @@ import { useNavigation, useRouter } from 'expo-router'
 import { useState } from 'react'
 import {
   ActivityIndicator, ImageBackground, KeyboardAvoidingView,
-  Platform, Pressable, StyleSheet, Text, TextInput, View,
+  Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { authApi } from '@/lib/api'
@@ -41,7 +41,8 @@ export default function SignInScreen() {
     <ImageBackground source={BG_IMAGE} style={s.bg} resizeMode="cover">
       <View style={s.overlay} />
       <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.kav}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={s.kav}>
+          <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
           {/* Close / back */}
           <Pressable style={s.closeBtn} onPress={goBack}>
@@ -128,6 +129,7 @@ export default function SignInScreen() {
             <Text style={s.signUpText}>Don't have an account?</Text>
             <Text style={s.signUpLink}> Sign up</Text>
           </Pressable>
+          </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </ImageBackground>
@@ -138,7 +140,8 @@ const s = StyleSheet.create({
   bg: { flex: 1 },
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,23,42,0.72)' },
   safe: { flex: 1 },
-  kav: { flex: 1, paddingHorizontal: Spacing.four, justifyContent: 'flex-end', paddingBottom: Spacing.four },
+  kav: { flex: 1 },
+  scroll: { flexGrow: 1, paddingHorizontal: Spacing.four, justifyContent: 'flex-end', paddingBottom: Spacing.four },
 
   closeBtn: {
     position: 'absolute', top: Spacing.three, right: Spacing.four,

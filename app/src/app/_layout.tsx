@@ -2,6 +2,8 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { useCallback, useEffect, useState } from 'react'
 import { StripeProvider } from '@stripe/stripe-react-native'
+import { StatusBar } from 'expo-status-bar'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { AuthContext, type AuthUser, clearAuth, loadStoredUser, persistMustChangePasswordCleared, saveAuth } from '@/lib/auth-store'
 import { queryClient } from '@/lib/query-client'
 import type { AuthResponse } from '@/lib/api'
@@ -62,20 +64,23 @@ export default function RootLayout() {
   }, [])
 
   return (
-    <StripeProvider publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? ''} merchantIdentifier="merchant.com.pbs.rw">
-      <QueryClientProvider client={queryClient}>
-        <AuthContext.Provider value={{ user, isLoading, signIn, signOut, clearMustChangePassword }}>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="(driver)" />
-            <Stack.Screen name="trip/[id]" />
-            <Stack.Screen name="sign-in" options={{ presentation: 'modal' }} />
-            <Stack.Screen name="sign-up" options={{ presentation: 'modal' }} />
-            <Stack.Screen name="change-password" />
-          </Stack>
-        </AuthContext.Provider>
-      </QueryClientProvider>
-    </StripeProvider>
+    <SafeAreaProvider>
+      <StripeProvider publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? ''} merchantIdentifier="merchant.com.pbs.rw">
+        <StatusBar style="light" backgroundColor="#0f172a" translucent={false} />
+        <QueryClientProvider client={queryClient}>
+          <AuthContext.Provider value={{ user, isLoading, signIn, signOut, clearMustChangePassword }}>
+            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0f172a' } }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="(driver)" />
+              <Stack.Screen name="trip/[id]" />
+              <Stack.Screen name="sign-in" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="sign-up" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="change-password" />
+            </Stack>
+          </AuthContext.Provider>
+        </QueryClientProvider>
+      </StripeProvider>
+    </SafeAreaProvider>
   )
 }

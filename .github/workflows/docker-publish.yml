@@ -105,13 +105,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Copy compose file to VPS
+      - name: Copy compose file and Caddyfile to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: docker-compose.prod.yml
+          source: "docker-compose.prod.yml,Caddyfile"
           target: ~/pbs
 
       - name: Deploy on VPS (zero-downtime)
@@ -131,7 +131,7 @@ jobs:
             set -e
             mkdir -p ~/pbs
 
-            # Allow rootless Podman to bind port 80 (requires sudo; skipped if unavailable)
+            # Allow rootless Podman to bind ports 80 and 443
             sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80 2>/dev/null || true
 
             # Generate DB password and JWT secret once, reuse on every subsequent deploy
@@ -186,8 +186,9 @@ jobs:
               ELAPSED=$((ELAPSED + 5))
               if [ $ELAPSED -ge $MAX_WAIT ]; then
                 echo "ERROR: health check timed out after ${MAX_WAIT}s"
-                podman logs --tail 30 pbs_api   2>/dev/null || true
+                podman logs --tail 30 pbs_api    2>/dev/null || true
                 podman logs --tail 30 pbs_client 2>/dev/null || true
+                podman logs --tail 30 pbs_caddy  2>/dev/null || true
                 exit 1
               fi
             done
@@ -206,7 +207,7 @@ jobs:
             podman ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
             echo ""
             echo "=== Health details ==="
-            for c in pbs_postgres pbs_api pbs_client; do
+            for c in pbs_postgres pbs_api pbs_client pbs_caddy; do
               STATUS=$(podman inspect "$c" --format "{{.State.Health.Status}}" 2>/dev/null || echo "no healthcheck")
               echo "  $c → $STATUS"
             done

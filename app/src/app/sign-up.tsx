@@ -42,7 +42,7 @@ export default function SignUpScreen() {
     <ImageBackground source={BG_IMAGE} style={s.bg} resizeMode="cover">
       <View style={s.overlay} />
       <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
             <Pressable style={s.closeBtn} onPress={goBack}>

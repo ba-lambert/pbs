@@ -1,0 +1,7 @@
+ebusrwanda.app {
+    reverse_proxy pbs_client:80
+}
+
+api.ebusrwanda.app {
+    reverse_proxy pbs_api:8000
+}

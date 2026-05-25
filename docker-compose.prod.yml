@@ -32,8 +32,6 @@ services:
       POSTGRES_DB: pbs_db
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
-    ports:
-      - "8000:8000"
     volumes:
       - pbs_uploads:/app/uploads
     networks:
@@ -52,8 +50,6 @@ services:
     image: ghcr.io/ba-lambert/pbs-client:latest
     container_name: pbs_client
     restart: unless-stopped
-    ports:
-      - "8080:80"
     networks:
       - pbs_net
     healthcheck:
@@ -66,9 +62,31 @@ services:
       pbs_api:
         condition: service_healthy
 
+  pbs_caddy:
+    image: docker.io/caddy:2-alpine
+    container_name: pbs_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - pbs_caddy_data:/data
+      - pbs_caddy_config:/config
+    networks:
+      - pbs_net
+    depends_on:
+      pbs_client:
+        condition: service_healthy
+      pbs_api:
+        condition: service_healthy
+
 volumes:
   pbs_postgres_data:
   pbs_uploads:
+  pbs_caddy_data:
+  pbs_caddy_config:
 
 networks:
   pbs_net:

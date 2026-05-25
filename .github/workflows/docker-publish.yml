@@ -118,7 +118,7 @@ jobs:
         uses: appleboy/ssh-action@v1.2.0
         env:
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY || '' }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
         with:
@@ -131,11 +131,7 @@ jobs:
             set -e
             mkdir -p ~/pbs
 
-            # Allow rootless Podman to bind ports 80 and 443 (persistent across reboots)
-            echo 'net.ipv4.ip_unprivileged_port_start=80' | sudo tee /etc/sysctl.d/99-unprivileged-ports.conf
-            sudo sysctl -p /etc/sysctl.d/99-unprivileged-ports.conf
-
-            # Generate DB password and JWT secret once, reuse on every subsequent deploy
+# Generate DB password and JWT secret once, reuse on every subsequent deploy
             if [ ! -f ~/pbs/.secrets ]; then
               echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)" >  ~/pbs/.secrets
               echo "JWT_SECRET=$(openssl rand -hex 32)"        >> ~/pbs/.secrets

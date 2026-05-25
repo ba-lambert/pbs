@@ -131,8 +131,9 @@ jobs:
             set -e
             mkdir -p ~/pbs
 
-            # Allow rootless Podman to bind ports 80 and 443
-            sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80 2>/dev/null || true
+            # Allow rootless Podman to bind ports 80 and 443 (persistent across reboots)
+            echo 'net.ipv4.ip_unprivileged_port_start=80' | sudo tee /etc/sysctl.d/99-unprivileged-ports.conf
+            sudo sysctl -p /etc/sysctl.d/99-unprivileged-ports.conf
 
             # Generate DB password and JWT secret once, reuse on every subsequent deploy
             if [ ! -f ~/pbs/.secrets ]; then

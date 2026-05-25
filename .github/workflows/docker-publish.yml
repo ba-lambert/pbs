@@ -131,7 +131,7 @@ jobs:
             set -e
             mkdir -p ~/pbs
 
-# Generate DB password and JWT secret once, reuse on every subsequent deploy
+            # Generate DB password and JWT secret once, reuse on every subsequent deploy
             if [ ! -f ~/pbs/.secrets ]; then
               echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)" >  ~/pbs/.secrets
               echo "JWT_SECRET=$(openssl rand -hex 32)"        >> ~/pbs/.secrets
@@ -158,7 +158,7 @@ jobs:
             echo ">>> Pulling new images..."
             podman-compose -f docker-compose.prod.yml pull
 
-            # ── Phase 2: force-recreate all app containers so new images are used ──
+            # ── Phase 2: force-recreate all containers so new images are used ──
             echo ">>> Restarting containers with new images..."
             podman-compose -f docker-compose.prod.yml up -d --remove-orphans --force-recreate
 
